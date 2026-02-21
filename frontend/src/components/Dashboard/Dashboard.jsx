@@ -3,7 +3,7 @@ import FileCard from './FileCard';
 import styles from './Dashboard.module.css';
 
 export default function Dashboard() {
-  const { files } = useOutletContext();
+  const { files, basePath = '' } = useOutletContext();
 
   if (!files?.length) {
     return (
@@ -19,7 +19,7 @@ export default function Dashboard() {
       <h1 className={styles.title}>📚 Archivos de Contexto</h1>
       <div className={styles.grid}>
         {files.map(file => (
-          <FileCard key={file.path} file={file} />
+          <FileCard key={file.path} file={file} basePath={basePath} />
         ))}
       </div>
     </div>

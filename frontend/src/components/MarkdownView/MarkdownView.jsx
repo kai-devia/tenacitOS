@@ -23,7 +23,7 @@ function getFileIcon(path) {
 export default function MarkdownView() {
   const { '*': filePath } = useParams();
   const navigate = useNavigate();
-  const { info } = useOutletContext();
+  const { info, basePath = '' } = useOutletContext();
   const { content, loading, error, reload } = useFileContent(filePath);
 
   // Listen for file changes via WebSocket
@@ -37,11 +37,11 @@ export default function MarkdownView() {
   useWebSocket(handleWsMessage);
 
   const handleEdit = () => {
-    navigate(`/edit/${encodeURIComponent(filePath)}`);
+    navigate(`${basePath}/edit/${encodeURIComponent(filePath)}`);
   };
 
   const handleBack = () => {
-    navigate('/');
+    navigate(basePath || '/');
   };
 
   if (loading) {

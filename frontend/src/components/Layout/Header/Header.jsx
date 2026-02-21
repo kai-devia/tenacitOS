@@ -2,20 +2,16 @@ import styles from './Header.module.css';
 import LiveBadge from './LiveBadge';
 import { useAuth } from '../../../hooks/useAuth';
 
-export default function Header({ isConnected, onMenuClick, showMenuButton }) {
+export default function Header({ isConnected, onLogout }) {
   const { logout } = useAuth();
+
+  const handleLogout = onLogout || logout;
 
   return (
     <header className={styles.header}>
-      {showMenuButton && (
-        <button className={styles.menuButton} onClick={onMenuClick} aria-label="Menu">
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
-      )}
+      {/* KAI title — only visible on mobile (desktop uses NavSidebar logo) */}
       <div className={styles.title}>
-        <img src="/kai-avatar.svg" alt="KAI" className={styles.logo} width="28" height="28" />
+        <img src="/kai-avatar.svg" alt="KAI" className={styles.logo} width="24" height="24" />
         <span className={styles.text}>KAI</span>
       </div>
 
@@ -23,7 +19,7 @@ export default function Header({ isConnected, onMenuClick, showMenuButton }) {
         <LiveBadge isConnected={isConnected} />
         <button
           className={styles.logoutBtn}
-          onClick={logout}
+          onClick={handleLogout}
           title="Cerrar sesión"
           aria-label="Cerrar sesión"
         >

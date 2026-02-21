@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { Outlet } from 'react-router-dom';
 import Header from './Header/Header';
-import Sidebar from './Sidebar/Sidebar';
+import NavSidebar from '../Navigation/NavSidebar';
+import BottomNav from '../Navigation/BottomNav';
 import { useFiles } from '../../hooks/useFiles';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useToast } from '../../hooks/useToast';
@@ -9,7 +10,7 @@ import { logout } from '../../api/client';
 import styles from './Layout.module.css';
 
 export default function Layout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [navCollapsed, setNavCollapsed] = useState(true); // starts collapsed (icon-only)
   const { tree, files, refresh } = useFiles();
   const { toasts, success, info, error } = useToast();
 
@@ -30,26 +31,40 @@ export default function Layout() {
 
   return (
     <div className={styles.layout}>
-      <Sidebar
-        tree={tree}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        onLogout={logout}
+      {/* Main navigation sidebar (desktop) */}
+      <NavSidebar
+        collapsed={navCollapsed}
+        onToggle={() => setNavCollapsed((v) => !v)}
       />
+
+      {/* Right side: header + content */}
       <div className={styles.main}>
         <Header
           isConnected={isConnected}
-          onMenuClick={() => setSidebarOpen(true)}
-          showMenuButton={true}
+          onLogout={logout}
         />
+
         <main className={styles.content}>
-          <Outlet context={{ files, tree, refresh, success, error, info }} />
+          <Outlet
+            context={{
+              files,
+              tree,
+              refresh,
+              success,
+              error,
+              info,
+              basePath: '',
+            }}
+          />
         </main>
       </div>
-      
+
+      {/* Mobile bottom navigation */}
+      <BottomNav />
+
       {/* Toast container */}
       <div className="toast-container">
-        {toasts.map(t => (
+        {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.type}`}>
             {t.message}
           </div>

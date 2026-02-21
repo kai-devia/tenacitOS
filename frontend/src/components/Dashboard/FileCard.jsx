@@ -58,7 +58,7 @@ function formatRelativeTime(dateStr) {
   return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
 }
 
-export default function FileCard({ file }) {
+export default function FileCard({ file, basePath = '' }) {
   const [preview, setPreview] = useState('');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -84,7 +84,7 @@ export default function FileCard({ file }) {
   }, [file.path]);
 
   const handleClick = () => {
-    navigate(`/file/${encodeURIComponent(file.path)}`);
+    navigate(`${basePath}/file/${encodeURIComponent(file.path)}`);
   };
 
   return (

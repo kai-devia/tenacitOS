@@ -6,7 +6,7 @@ import styles from './Editor.module.css';
 export default function Editor() {
   const { '*': filePath } = useParams();
   const navigate = useNavigate();
-  const { success, error: showError } = useOutletContext();
+  const { success, error: showError, basePath = '' } = useOutletContext();
   const { content, loading, error, saving, save } = useFileContent(filePath);
   const [editedContent, setEditedContent] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
@@ -25,7 +25,7 @@ export default function Editor() {
     const ok = await save(editedContent);
     if (ok) {
       success?.('💾 Guardado correctamente');
-      navigate(`/file/${encodeURIComponent(filePath)}`);
+      navigate(`${basePath}/file/${encodeURIComponent(filePath)}`);
     } else {
       showError?.('Error al guardar');
     }
@@ -33,7 +33,7 @@ export default function Editor() {
 
   const handleCancel = () => {
     if (hasChanges && !confirm('¿Descartar cambios?')) return;
-    navigate(`/file/${encodeURIComponent(filePath)}`);
+    navigate(`${basePath}/file/${encodeURIComponent(filePath)}`);
   };
 
   if (loading) {
@@ -49,7 +49,7 @@ export default function Editor() {
     return (
       <div className={styles.error}>
         <p>❌ {error}</p>
-        <button onClick={() => navigate('/')}>Volver al dashboard</button>
+        <button onClick={() => navigate(basePath || '/')}>Volver al dashboard</button>
       </div>
     );
   }

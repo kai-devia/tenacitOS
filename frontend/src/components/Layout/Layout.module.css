@@ -9,21 +9,19 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0; /* prevent flex overflow */
 }
 
 .content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
   background: var(--bg-base);
+  /* Remove default padding — each section handles its own */
 }
 
+/* On mobile: add bottom padding for the bottom nav bar */
 @media (max-width: 768px) {
-  .layout {
-    flex-direction: column;
-  }
-  
   .content {
-    padding: 16px;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0));
   }
 }
