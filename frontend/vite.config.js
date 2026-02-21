@@ -8,6 +8,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      workbox: {
+        skipWaiting: true,       // nuevo SW activa inmediatamente sin esperar
+        clientsClaim: true,      // el nuevo SW toma control de todas las tabs
+        cleanupOutdatedCaches: true,
+      },
       manifest: {
         name: 'KAI DOC PWA',
         short_name: 'KaiDoc',

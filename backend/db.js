@@ -65,6 +65,14 @@ db.exec(`
   );
 `);
 
+// ─── Column migrations (safe — ignores if column already exists) ─────────
+const runMigration = (sql) => {
+  try { db.exec(sql); } catch (_) { /* column already exists */ }
+};
+runMigration('ALTER TABLE webauthn_challenges ADD COLUMN rp_id TEXT DEFAULT "localhost"');
+runMigration('ALTER TABLE webauthn_challenges ADD COLUMN origin TEXT DEFAULT "http://localhost"');
+runMigration('ALTER TABLE webauthn_credentials ADD COLUMN rp_id TEXT DEFAULT "localhost"');
+
 // ─── Seed initial events if table is empty ────────────────────────────────
 const eventsCount = db.prepare('SELECT COUNT(*) as count FROM events').get();
 if (eventsCount.count === 0) {

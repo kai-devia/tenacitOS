@@ -13,15 +13,46 @@ const { jwtSecret, jwtExpiry } = require('../config/env');
 
 const router = express.Router();
 
-// ─── Configuration ───────────────────────────────────────────────────────────
-// Configurable via env vars for Cloudflare Tunnel support
+// ─── Configuration ────────────────────────────────────────────────────────────
 const RP_NAME = process.env.WEBAUTHN_RP_NAME || 'Kai Doc';
-const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost';
-const ORIGIN = process.env.WEBAUTHN_ORIGIN || 'http://localhost';
-
 const USER_ID = 'guille';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+/**
+ * Extracts rpID and origin dynamically from the request.
+ * This allows the app to work from any domain (localhost, Cloudflare Tunnel, etc.)
+ * Priority: env vars → request Origin header → fallback to localhost
+ */
+function getRpInfo(req) {
+  // Env vars override (for stable production domains)
+  if (process.env.WEBAUTHN_RP_ID && process.env.WEBAUTHN_ORIGIN) {
+    return {
+      rpID: process.env.WEBAUTHN_RP_ID,
+      origin: process.env.WEBAUTHN_ORIGIN,
+    };
+  }
+
+  // Extract from request Origin header
+  const originHeader = req.headers.origin || req.headers.referer;
+  if (originHeader) {
+    try {
+      const url = new URL(originHeader);
+      return {
+        rpID: url.hostname,
+        origin: url.origin,
+      };
+    } catch (_) {
+      // fall through to default
+    }
+  }
+
+  // Fallback
+  return {
+    rpID: 'localhost',
+    origin: 'http://localhost',
+  };
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function cleanOldChallenges() {
   db.prepare(`
@@ -37,16 +68,16 @@ function getStoredCredentials(userId) {
 }
 
 // ─── POST /register/start ─────────────────────────────────────────────────────
-// Requires JWT. Generates registration options for the browser.
 router.post('/register/start', authMiddleware, async (req, res) => {
   try {
     cleanOldChallenges();
+    const { rpID, origin } = getRpInfo(req);
 
     const existingCredentials = getStoredCredentials(USER_ID);
 
     const options = await generateRegistrationOptions({
       rpName: RP_NAME,
-      rpID: RP_ID,
+      rpID,
       userID: USER_ID,
       userName: USER_ID,
       userDisplayName: 'Guille',
@@ -61,10 +92,10 @@ router.post('/register/start', authMiddleware, async (req, res) => {
       },
     });
 
-    // Store challenge for verification
+    // Store challenge with the domain it was created for
     db.prepare(
-      'INSERT INTO webauthn_challenges (user_id, challenge) VALUES (?, ?)'
-    ).run(USER_ID, options.challenge);
+      'INSERT INTO webauthn_challenges (user_id, challenge, rp_id, origin) VALUES (?, ?, ?, ?)'
+    ).run(USER_ID, options.challenge, rpID, origin);
 
     res.json(options);
   } catch (err) {
@@ -74,7 +105,6 @@ router.post('/register/start', authMiddleware, async (req, res) => {
 });
 
 // ─── POST /register/finish ────────────────────────────────────────────────────
-// Requires JWT. Verifies registration and stores the credential.
 router.post('/register/finish', authMiddleware, async (req, res) => {
   try {
     cleanOldChallenges();
@@ -92,16 +122,14 @@ router.post('/register/finish', authMiddleware, async (req, res) => {
       verification = await verifyRegistrationResponse({
         response: req.body,
         expectedChallenge: challengeRow.challenge,
-        expectedOrigin: ORIGIN,
-        expectedRPID: RP_ID,
+        expectedOrigin: challengeRow.origin || 'http://localhost',
+        expectedRPID: challengeRow.rp_id || 'localhost',
       });
     } catch (verifyErr) {
-      // Delete used challenge even on failure
       db.prepare('DELETE FROM webauthn_challenges WHERE id = ?').run(challengeRow.id);
       throw verifyErr;
     }
 
-    // Delete used challenge
     db.prepare('DELETE FROM webauthn_challenges WHERE id = ?').run(challengeRow.id);
 
     if (!verification.verified || !verification.registrationInfo) {
@@ -115,11 +143,9 @@ router.post('/register/finish', authMiddleware, async (req, res) => {
       credentialDeviceType,
     } = verification.registrationInfo;
 
-    // Convert Uint8Array → base64url string for storage
     const credIdStr = Buffer.from(credentialID).toString('base64url');
     const pubKeyStr = Buffer.from(credentialPublicKey).toString('base64url');
 
-    // Upsert credential
     const existing = db.prepare(
       'SELECT id FROM webauthn_credentials WHERE credential_id = ?'
     ).get(credIdStr);
@@ -127,17 +153,17 @@ router.post('/register/finish', authMiddleware, async (req, res) => {
     if (existing) {
       db.prepare(`
         UPDATE webauthn_credentials 
-        SET public_key = ?, counter = ?, device_type = ?
+        SET public_key = ?, counter = ?, device_type = ?, rp_id = ?
         WHERE credential_id = ?
-      `).run(pubKeyStr, counter, credentialDeviceType || '', credIdStr);
+      `).run(pubKeyStr, counter, credentialDeviceType || '', challengeRow.rp_id || 'localhost', credIdStr);
     } else {
       db.prepare(`
-        INSERT INTO webauthn_credentials (user_id, credential_id, public_key, counter, device_type)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(USER_ID, credIdStr, pubKeyStr, counter, credentialDeviceType || '');
+        INSERT INTO webauthn_credentials (user_id, credential_id, public_key, counter, device_type, rp_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(USER_ID, credIdStr, pubKeyStr, counter, credentialDeviceType || '', challengeRow.rp_id || 'localhost');
     }
 
-    console.log(`✅ WebAuthn credential registered for user ${USER_ID}`);
+    console.log(`✅ WebAuthn credential registered for ${USER_ID} on rpID: ${challengeRow.rp_id}`);
     res.json({ ok: true });
   } catch (err) {
     console.error('WebAuthn register/finish error:', err);
@@ -146,15 +172,15 @@ router.post('/register/finish', authMiddleware, async (req, res) => {
 });
 
 // ─── POST /login/start ────────────────────────────────────────────────────────
-// Public. Generates authentication options for the browser.
 router.post('/login/start', async (req, res) => {
   try {
     cleanOldChallenges();
+    const { rpID, origin } = getRpInfo(req);
 
     const credentials = getStoredCredentials(USER_ID);
 
     const options = await generateAuthenticationOptions({
-      rpID: RP_ID,
+      rpID,
       userVerification: 'preferred',
       allowCredentials: credentials.map(c => ({
         id: c.credential_id,
@@ -162,12 +188,10 @@ router.post('/login/start', async (req, res) => {
       })),
     });
 
-    // Store challenge
     db.prepare(
-      'INSERT INTO webauthn_challenges (user_id, challenge) VALUES (?, ?)'
-    ).run(USER_ID, options.challenge);
+      'INSERT INTO webauthn_challenges (user_id, challenge, rp_id, origin) VALUES (?, ?, ?, ?)'
+    ).run(USER_ID, options.challenge, rpID, origin);
 
-    // Include whether credentials exist so the frontend can show a hint
     res.json({ ...options, hasCredentials: credentials.length > 0 });
   } catch (err) {
     console.error('WebAuthn login/start error:', err);
@@ -176,7 +200,6 @@ router.post('/login/start', async (req, res) => {
 });
 
 // ─── POST /login/finish ───────────────────────────────────────────────────────
-// Public. Verifies authentication and issues a JWT.
 router.post('/login/finish', async (req, res) => {
   try {
     cleanOldChallenges();
@@ -204,8 +227,8 @@ router.post('/login/finish', async (req, res) => {
       verification = await verifyAuthenticationResponse({
         response: req.body,
         expectedChallenge: challengeRow.challenge,
-        expectedOrigin: ORIGIN,
-        expectedRPID: RP_ID,
+        expectedOrigin: challengeRow.origin || credential.rp_id ? `https://${credential.rp_id}` : 'http://localhost',
+        expectedRPID: challengeRow.rp_id || credential.rp_id || 'localhost',
         authenticator: {
           credentialID: Buffer.from(credential.credential_id, 'base64url'),
           credentialPublicKey: Buffer.from(credential.public_key, 'base64url'),
@@ -217,22 +240,19 @@ router.post('/login/finish', async (req, res) => {
       throw verifyErr;
     }
 
-    // Delete used challenge
     db.prepare('DELETE FROM webauthn_challenges WHERE id = ?').run(challengeRow.id);
 
     if (!verification.verified) {
       return res.status(400).json({ error: 'Autenticación biométrica fallida' });
     }
 
-    // Update counter (anti-replay protection)
     db.prepare(
       'UPDATE webauthn_credentials SET counter = ? WHERE credential_id = ?'
     ).run(verification.authenticationInfo.newCounter, credential.credential_id);
 
-    // Issue JWT
     const token = jwt.sign({ user: USER_ID }, jwtSecret, { expiresIn: jwtExpiry });
 
-    console.log(`✅ WebAuthn login successful for user ${USER_ID}`);
+    console.log(`✅ WebAuthn login successful for ${USER_ID}`);
     res.json({ token });
   } catch (err) {
     console.error('WebAuthn login/finish error:', err);
@@ -240,17 +260,15 @@ router.post('/login/finish', async (req, res) => {
   }
 });
 
-// ─── GET /credentials ──────────────────────────────────────────────────────────
-// Requires JWT. Returns list of registered credentials.
+// ─── GET /credentials ─────────────────────────────────────────────────────────
 router.get('/credentials', authMiddleware, (req, res) => {
   const credentials = db.prepare(
-    'SELECT id, credential_id, device_type, created_at FROM webauthn_credentials WHERE user_id = ?'
+    'SELECT id, credential_id, device_type, rp_id, created_at FROM webauthn_credentials WHERE user_id = ?'
   ).all(USER_ID);
   res.json({ credentials });
 });
 
-// ─── DELETE /credentials/:id ───────────────────────────────────────────────────
-// Requires JWT. Deletes a registered credential.
+// ─── DELETE /credentials/:id ──────────────────────────────────────────────────
 router.delete('/credentials/:id', authMiddleware, (req, res) => {
   const { id } = req.params;
   const result = db.prepare(
