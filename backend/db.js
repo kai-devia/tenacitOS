@@ -18,6 +18,23 @@ db.pragma('foreign_keys = ON');
 
 // ─── Migrations ────────────────────────────────────────────────────────────
 db.exec(`
+  CREATE TABLE IF NOT EXISTS webauthn_credentials (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     TEXT    NOT NULL DEFAULT 'guille',
+    credential_id TEXT  NOT NULL UNIQUE,
+    public_key  TEXT    NOT NULL,
+    counter     INTEGER NOT NULL DEFAULT 0,
+    device_type TEXT    DEFAULT '',
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS webauthn_challenges (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     TEXT    NOT NULL DEFAULT 'guille',
+    challenge   TEXT    NOT NULL,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS tasks (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     title       TEXT    NOT NULL,
