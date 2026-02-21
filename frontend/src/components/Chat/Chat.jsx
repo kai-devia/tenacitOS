@@ -48,25 +48,27 @@ function Message({ msg, isStreaming }) {
 // ── Main component ────────────────────────────────────────────────────────
 
 export default function Chat() {
-  const [messages,     setMessages]     = useState([]);
-  const [input,        setInput]        = useState('');
-  const [loading,      setLoading]      = useState(true);
-  const [streaming,    setStreaming]     = useState(false);
-  const [streamText,   setStreamText]   = useState('');
-  const [error,        setError]        = useState(null);
-  const [pending,      setPending]      = useState(0); // mensajes en cola
+  const [messages,  setMessages]  = useState([]);
+  const [input,     setInput]     = useState('');
+  const [loading,   setLoading]   = useState(true);
+  const [streaming, setStreaming] = useState(false);
+  const [streamText,setStreamText]= useState('');
+  const [error,     setError]     = useState(null);
+  const [pending,   setPending]   = useState(0);
 
-  const bottomRef  = useRef(null);
-  const inputRef   = useRef(null);
-  const queueRef   = useRef([]);     // cola de mensajes pendientes
-  const busyRef    = useRef(false);  // true mientras procesa un mensaje
+  const bottomRef    = useRef(null);
+  const inputRef     = useRef(null);
+  const queueRef     = useRef([]);
+  const busyRef      = useRef(false);
 
-  // ── Scroll ──────────────────────────────────────────────────────────────
+  // ── Scroll ───────────────────────────────────────────────────────────────
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  useEffect(() => { scrollToBottom(); }, [messages.length, streaming, streamText, scrollToBottom]);
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages.length, streaming, streamText, scrollToBottom]);
 
   // ── Load history ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -82,7 +84,14 @@ export default function Chat() {
       .catch(err => { setError(err.message); setLoading(false); });
   }, []); // eslint-disable-line
 
-  // ── Process one message from queue ───────────────────────────────────────
+  // ── processNext: saca un msg de la cola y lo procesa ─────────────────────
+  //
+  // Diseño:
+  //  - El mensaje del usuario YA está en el chat (añadido optimisticamente en sendMessage)
+  //  - Solo necesitamos enviar al backend y mostrar la respuesta
+  //  - Cuando llega 'user_message' del SSE lo ignoramos (ya está en el chat)
+  //  - Cuando llega 'done' añadimos la respuesta del asistente
+  //
   const processNext = useCallback(async () => {
     if (busyRef.current || queueRef.current.length === 0) return;
 
@@ -110,6 +119,7 @@ export default function Chat() {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
+
         buf += decoder.decode(value, { stream: true });
         const lines = buf.split('\n');
         buf = lines.pop();
@@ -119,9 +129,8 @@ export default function Chat() {
           let ev;
           try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
 
-          if (ev.type === 'user_message') {
-            setMessages(prev => [...prev, ev.message]);
-          } else if (ev.type === 'delta') {
+          // 'user_message' se ignora — ya está en el chat por el optimistic update
+          if (ev.type === 'delta') {
             accumulated += ev.content;
             setStreamText(accumulated);
           } else if (ev.type === 'done') {
@@ -137,14 +146,15 @@ export default function Chat() {
       setError(err.message);
       setStreaming(false);
       setStreamText('');
+    } finally {
+      busyRef.current = false;
+      if (queueRef.current.length > 0) {
+        processNext();
+      }
     }
-
-    busyRef.current = false;
-    // Procesar el siguiente si hay cola
-    if (queueRef.current.length > 0) processNext();
   }, []); // eslint-disable-line
 
-  // ── Send: encola el mensaje y arranca el procesador si está libre ─────────
+  // ── sendMessage: muestra el msg al instante y lo encola ──────────────────
   const sendMessage = useCallback(() => {
     const text = input.trim();
     if (!text) return;
@@ -152,12 +162,23 @@ export default function Chat() {
     setInput('');
     if (inputRef.current) inputRef.current.style.height = 'auto';
 
+    // Optimistic update: el mensaje aparece en el chat INMEDIATAMENTE
+    setMessages(prev => [...prev, {
+      id: `local-${Date.now()}`,
+      role: 'user',
+      content: text,
+      created_at: new Date().toISOString().replace('T', ' ').split('.')[0],
+    }]);
+
     queueRef.current.push(text);
     setPending(queueRef.current.length);
-    processNext();
+
+    if (!busyRef.current) {
+      processNext();
+    }
   }, [input, processNext]);
 
-  // ── Keyboard handlers ─────────────────────────────────────────────────────
+  // ── Input handlers ────────────────────────────────────────────────────────
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
@@ -233,7 +254,6 @@ export default function Chat() {
           disabled={!input.trim()}
           aria-label="Enviar"
         >
-          {/* Siempre muestra la flecha — el indicador de proceso está en el chat */}
           <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
             <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
           </svg>
