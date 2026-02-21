@@ -143,6 +143,38 @@ export async function deleteTask(id) {
   return request(`/tasks/${id}`, { method: 'DELETE' });
 }
 
+// ─── WebAuthn API ────────────────────────────────────────────────────────────
+
+export async function webauthnRegisterStart() {
+  return request('/auth/webauthn/register/start', { method: 'POST' });
+}
+
+export async function webauthnRegisterFinish(attestation) {
+  return request('/auth/webauthn/register/finish', {
+    method: 'POST',
+    body: JSON.stringify(attestation),
+  });
+}
+
+export async function webauthnLoginStart() {
+  return request('/auth/webauthn/login/start', { method: 'POST' });
+}
+
+export async function webauthnLoginFinish(assertion) {
+  return request('/auth/webauthn/login/finish', {
+    method: 'POST',
+    body: JSON.stringify(assertion),
+  });
+}
+
+export async function getWebauthnCredentials() {
+  return request('/auth/webauthn/credentials');
+}
+
+export async function deleteWebauthnCredential(id) {
+  return request(`/auth/webauthn/credentials/${id}`, { method: 'DELETE' });
+}
+
 // ─── Events API ──────────────────────────────────────────────────────────────
 
 export async function getEvents() {

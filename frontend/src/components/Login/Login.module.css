@@ -97,3 +97,43 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.biometricButton {
+  width: 100%;
+  padding: 14px;
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 500;
+  margin-top: 12px;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.biometricButton:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-base);
+}
+
+.biometricButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
