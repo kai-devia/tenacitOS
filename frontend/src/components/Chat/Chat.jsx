@@ -102,11 +102,6 @@ export default function Chat() {
     setStreamingText('');
     setError(null);
 
-    // Mantener el foco en el input después de enviar (fix mobile)
-    setTimeout(() => {
-      if (inputRef.current) inputRef.current.focus();
-    }, 0);
-
     const token = getToken();
 
     try {
@@ -147,7 +142,6 @@ export default function Chat() {
             setMessages(prev => [...prev, event.message]);
             setStreamingText('');
             setStreaming(false);
-            inputRef.current?.focus();
           } else if (event.type === 'error') {
             throw new Error(event.error);
           }
@@ -237,7 +231,7 @@ export default function Chat() {
           onKeyDown={handleKeyDown}
           placeholder="Escribe un mensaje..."
           rows={1}
-          disabled={streaming}
+          {/* No deshabilitar — disabled cierra el teclado en móvil */}
         />
         <button
           className={styles.sendBtn}
