@@ -1,149 +1,316 @@
 const express = require('express');
+const { execSync } = require('child_process');
 const fs = require('fs');
-const { exec } = require('child_process');
-const { verifyToken } = require('../middlewares/auth');
-
+const path = require('path');
+const db = require('../db');
 const router = express.Router();
 
-// Auth middleware
-router.use((req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
-  if (!verifyToken(authHeader.slice(7))) return res.status(401).json({ error: 'Invalid token' });
-  next();
-});
+// ── Claude limits (Max subscription approximations)
+// Output tokens per 5h session: ~50k on Max plan
+// Output tokens per week: ~500k on Max plan
+// Guille puede ajustar estos valores
+const CLAUDE_LIMITS = {
+  sessionOutputTokens: 50_000,   // tokens salida por sesión (5h)
+  weeklyOutputTokens: 500_000,  // tokens salida por semana
+};
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ── CPU: usar delta entre lecturas de /proc/stat ───────────────────────────
+let _prevCpuStat = null;
 
-/**
- * CPU usage via /proc/stat sampling (500ms delta)
- * Works inside Docker — /proc/stat reflects the host kernel
- */
-function getCpuUsage() {
-  return new Promise((resolve) => {
-    const readStat = () => {
-      try {
-        const line = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0];
-        const parts = line.split(/\s+/).slice(1).map(Number);
-        const idle = parts[3] + (parts[4] || 0); // idle + iowait
-        const total = parts.reduce((a, b) => a + b, 0);
-        return { idle, total };
-      } catch { return { idle: 0, total: 1 }; }
-    };
-
-    const s1 = readStat();
-    setTimeout(() => {
-      const s2 = readStat();
-      const idleDiff = s2.idle - s1.idle;
-      const totalDiff = s2.total - s1.total;
-      const usage = totalDiff === 0 ? 0 : ((totalDiff - idleDiff) / totalDiff) * 100;
-      resolve(Math.round(usage * 10) / 10);
-    }, 500);
-  });
+function readProcStat() {
+  const line = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0];
+  const vals = line.trim().split(/\s+/).slice(1).map(Number);
+  // user, nice, system, idle, iowait, irq, softirq, steal, ...
+  const idle  = (vals[3] || 0) + (vals[4] || 0); // idle + iowait
+  const total = vals.reduce((a, b) => a + b, 0);
+  return { idle, total };
 }
 
-/**
- * RAM from /proc/meminfo — reflects host even inside Docker
- */
-function getMemoryInfo() {
+function getCpu() {
   try {
-    const raw = fs.readFileSync('/proc/meminfo', 'utf8');
-    const get = (key) => {
-      const m = raw.match(new RegExp(`^${key}:\\s+(\\d+)`, 'm'));
-      return m ? parseInt(m[1]) * 1024 : 0; // kB → bytes
-    };
-    const total = get('MemTotal');
-    const available = get('MemAvailable');
-    const used = total - available;
+    const curr = readProcStat();
+    let usage = 0;
+
+    if (_prevCpuStat) {
+      const dIdle  = curr.idle  - _prevCpuStat.idle;
+      const dTotal = curr.total - _prevCpuStat.total;
+      usage = dTotal > 0 ? Math.round(((dTotal - dIdle) / dTotal) * 1000) / 10 : 0;
+      usage = Math.min(100, Math.max(0, usage));
+    }
+    _prevCpuStat = curr;
+
+    const cpuinfo = fs.readFileSync('/proc/cpuinfo', 'utf8');
+    const modelMatch = cpuinfo.match(/model name\s*:\s*(.+)/);
+    const coreCount  = (cpuinfo.match(/^processor/gm) || []).length;
+
     return {
-      total: Math.round(total / 1024 / 1024),       // MB
-      used: Math.round(used / 1024 / 1024),
-      free: Math.round(available / 1024 / 1024),
-      percent: Math.round((used / total) * 1000) / 10,
+      usage,
+      model: modelMatch ? modelMatch[1].trim() : 'Unknown',
+      cores: coreCount,
     };
   } catch {
-    return { total: 0, used: 0, free: 0, percent: 0 };
+    return { usage: 0, model: 'Unknown', cores: 0 };
   }
 }
 
-/**
- * System uptime from /proc/uptime — reflects host
- */
+// ── Disk: usar el volumen montado /workspace (apunta al host) ─────────────
+function getDiskUsage() {
+  try {
+    const physicalGb = parseInt(process.env.PHYSICAL_DISK_GB || '0', 10);
+
+    // BusyBox-compatible: df -B1 -P (POSIX)
+    // Columns: Filesystem, 1-blocks(total), Used, Available, Capacity%, Mountpoint
+    const raw = execSync('df -B1 -P /workspace', { timeout: 5000 })
+      .toString().split('\n');
+    const parts    = raw[1].trim().split(/\s+/);
+    const usedBytes  = parseInt(parts[2], 10);
+    const availBytes = parseInt(parts[3], 10);
+
+    const usedGb  = Math.round(usedBytes / 1_073_741_824);
+    const totalGb = physicalGb || Math.round((usedBytes + availBytes) / 1_073_741_824);
+    const freeGb  = totalGb - usedGb;
+    const percent = totalGb > 0 ? Math.round((usedGb / totalGb) * 100) : 0;
+
+    return { used: usedGb, total: totalGb, free: freeGb, percent };
+  } catch {
+    return { used: 0, total: 0, free: 0, percent: 0 };
+  }
+}
+
+// ── Memory ─────────────────────────────────────────────────────────────────
+function getMemory() {
+  try {
+    const meminfo = fs.readFileSync('/proc/meminfo', 'utf8');
+    const total = parseInt(meminfo.match(/MemTotal:\s+(\d+)/)[1], 10) * 1024;
+    const avail = parseInt(meminfo.match(/MemAvailable:\s+(\d+)/)[1], 10) * 1024;
+    const used  = total - avail;
+    return {
+      total:   Math.round(total / 1_048_576),
+      used:    Math.round(used  / 1_048_576),
+      percent: Math.round((used / total) * 100),
+    };
+  } catch {
+    return { total: 0, used: 0, percent: 0 };
+  }
+}
+
+// ── Uptime ─────────────────────────────────────────────────────────────────
 function getUptime() {
   try {
     return Math.floor(parseFloat(fs.readFileSync('/proc/uptime', 'utf8').split(' ')[0]));
-  } catch { return 0; }
+  } catch {
+    return 0;
+  }
 }
 
-/**
- * CPU model from /proc/cpuinfo
- */
-function getCpuInfo() {
+// ── Hostname ───────────────────────────────────────────────────────────────
+function getHostname() {
   try {
-    const raw = fs.readFileSync('/proc/cpuinfo', 'utf8');
-    const model = (raw.match(/^model name\s*:\s*(.+)$/m) || [])[1] || 'Unknown';
-    const cores = (raw.match(/^processor\s*:/gm) || []).length;
-    return { model: model.replace(/\s+/g, ' ').trim(), cores };
-  } catch { return { model: 'Unknown', cores: 0 }; }
+    return execSync('hostname', { timeout: 3000 }).toString().trim();
+  } catch {
+    return 'unknown';
+  }
 }
 
-/**
- * Disk via df on /workspace (mounted host volume) — shows real host FS
- * Physical disk size from env var PHYSICAL_DISK_GB (set in docker-compose)
- */
-function getDiskUsage() {
-  return new Promise((resolve) => {
-    exec('df -PBG /workspace 2>/dev/null', (err, stdout) => {
-      if (err) return resolve({ total: 0, used: 0, free: 0, percent: 0 });
-      try {
-        // -P (POSIX) ensures no line wrapping. Format: FS Total Used Avail Use% Mounted
-        const parts = stdout.trim().split('\n')[1].split(/\s+/);
-        const partitionTotal = parseInt(parts[1]) || 0;
-        const used = parseInt(parts[2]) || 0;
-        const free = parseInt(parts[3]) || 0;
-        const percent = parseInt(parts[4]) || 0;
-
-        // If physical disk size is configured, use it as the "total"
-        const physicalGB = parseInt(process.env.PHYSICAL_DISK_GB) || partitionTotal;
-
-        resolve({ total: physicalGB, used, free: physicalGB - used, percent });
-      } catch { resolve({ total: 0, used: 0, free: 0, percent: 0 }); }
-    });
-  });
+// ── Claude usage — tracking con deltas + acumulado diario ─────────────────
+function readSessionsFile() {
+  const p = path.join(
+    process.env.HOME || '/home/kai',
+    '.openclaw/agents/main/sessions/sessions.json'
+  );
+  if (!fs.existsSync(p)) return null;
+  return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
-// ─── Routes ──────────────────────────────────────────────────────────────────
-
-/**
- * GET /api/system/metrics
- */
-router.get('/metrics', async (req, res) => {
+function getClaudeUsage() {
   try {
-    const [cpuUsage, disk] = await Promise.all([getCpuUsage(), getDiskUsage()]);
-    const { model, cores } = getCpuInfo();
-    const memory = getMemoryInfo();
-    const uptime = getUptime();
+    const sessions = readSessionsFile();
+    if (!sessions) return null;
 
+    const models = new Set();
+    let currentIn  = 0;
+    let currentOut = 0;
+    let mainContextTokens = 0;
+    let mainOut = 0;
+
+    for (const [key, sess] of Object.entries(sessions)) {
+      if (typeof sess !== 'object' || !sess) continue;
+      currentIn  += sess.inputTokens  || 0;
+      currentOut += sess.outputTokens || 0;
+      if (sess.model) models.add(sess.model);
+      if (key === 'agent:main:main') {
+        mainContextTokens = sess.totalTokens  || 0;
+        mainOut           = sess.outputTokens || 0;
+      }
+    }
+
+    // ── Delta tracking ──────────────────────────────────────────────────
+    const today    = new Date().toISOString().slice(0, 10);
+    const snapshot = db.prepare('SELECT * FROM claude_usage_snapshot WHERE id = 1').get();
+    const prevIn   = snapshot?.input_tokens  || 0;
+    const prevOut  = snapshot?.output_tokens || 0;
+    const deltaIn  = Math.max(0, currentIn  - prevIn);
+    const deltaOut = Math.max(0, currentOut - prevOut);
+
+    if (deltaIn > 0 || deltaOut > 0) {
+      db.prepare(`
+        INSERT INTO claude_daily_usage (date, input_tokens, output_tokens)
+        VALUES (?, ?, ?)
+        ON CONFLICT(date) DO UPDATE SET
+          input_tokens  = input_tokens  + excluded.input_tokens,
+          output_tokens = output_tokens + excluded.output_tokens
+      `).run(today, deltaIn, deltaOut);
+
+      db.prepare(`
+        INSERT INTO claude_usage_snapshot (id, input_tokens, output_tokens, captured_at)
+        VALUES (1, ?, ?, datetime('now'))
+        ON CONFLICT(id) DO UPDATE SET
+          input_tokens = excluded.input_tokens,
+          output_tokens = excluded.output_tokens,
+          captured_at  = excluded.captured_at
+      `).run(currentIn, currentOut);
+    }
+
+    // ── Aggregates ──────────────────────────────────────────────────────
+    const todayRow = db.prepare('SELECT * FROM claude_daily_usage WHERE date = ?').get(today);
+    const weekRow  = db.prepare(`
+      SELECT SUM(input_tokens) as in_sum, SUM(output_tokens) as out_sum
+      FROM claude_daily_usage
+      WHERE date >= date('now', '-6 days')
+    `).get();
+
+    const todayIn  = todayRow?.input_tokens  || 0;
+    const todayOut = todayRow?.output_tokens || 0;
+    const weekIn   = weekRow?.in_sum  || 0;
+    const weekOut  = weekRow?.out_sum || 0;
+
+    // ── Usar límite calibrado si existe ────────────────────────────────
+    const webLimits = db.prepare('SELECT * FROM claude_web_limits WHERE id = 1').get();
+    const calibratedWeeklyLimit = webLimits?.estimated_weekly_limit || null;
+    const weekTotal = weekIn + weekOut;
+    const weekPct = calibratedWeeklyLimit
+      ? Math.min(100, Math.round((weekTotal / calibratedWeeklyLimit) * 100))
+      : null;
+
+    return {
+      session: {
+        contextTokens: mainContextTokens,
+        outputTokens:  mainOut,
+      },
+      today: {
+        inputTokens:  todayIn,
+        outputTokens: todayOut,
+        total:        todayIn + todayOut,
+      },
+      week: {
+        inputTokens:  weekIn,
+        outputTokens: weekOut,
+        total:        weekTotal,
+        limit:        calibratedWeeklyLimit,
+        percent:      weekPct,
+      },
+      models: [...models],
+      calibrated: !!calibratedWeeklyLimit,
+    };
+  } catch (err) {
+    console.error('claude-usage error:', err.message);
+    return null;
+  }
+}
+
+// ── Routes ─────────────────────────────────────────────────────────────────
+
+router.get('/metrics', (req, res) => {
+  try {
     res.json({
-      cpu: { usage: cpuUsage, cores, model },
-      memory,
-      disk,
-      uptime,
-      platform: process.env.PLATFORM || 'linux',
-      hostname: process.env.HOSTNAME || 'kai-pc',
+      hostname: getHostname(),
+      cpu:      getCpu(),
+      memory:   getMemory(),
+      disk:     getDiskUsage(),
+      uptime:   getUptime(),
     });
   } catch (err) {
-    console.error('System metrics error:', err);
-    res.status(500).json({ error: 'Failed to get system metrics' });
+    res.status(500).json({ error: err.message });
   }
 });
 
-/**
- * GET /api/system/subagents
- * TODO: Query OpenClaw internal API when available
- */
-router.get('/subagents', (_req, res) => {
+router.get('/subagents', (req, res) => {
   res.json({ count: 0 });
+});
+
+// ── claude.ai manual limits ────────────────────────────────────────────────
+router.get('/claude-web-limits', (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM claude_web_limits WHERE id = 1').get();
+    res.json(row || {
+      session_pct: 0, weekly_all_pct: 0, weekly_sonnet_pct: 0,
+      session_resets_in: '', weekly_resets_at: '', updated_at: null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/claude-web-limits', (req, res) => {
+  try {
+    const { session_pct, weekly_all_pct, weekly_sonnet_pct, session_resets_in, weekly_resets_at } = req.body;
+
+    // Auto-calibrate weekly token limit when weekly_all_pct is provided
+    let estimated_weekly_limit = null;
+    if (weekly_all_pct > 0) {
+      // Sum all tracked tokens so far as the "tokens at X%" reference point
+      const row = db.prepare(`
+        SELECT SUM(input_tokens) + SUM(output_tokens) as total
+        FROM claude_daily_usage
+      `).get();
+      const currentTokens = row?.total || 0;
+      if (currentTokens > 0) {
+        estimated_weekly_limit = Math.round(currentTokens / (weekly_all_pct / 100));
+      }
+    }
+
+    db.prepare(`
+      INSERT INTO claude_web_limits
+        (id, session_pct, weekly_all_pct, weekly_sonnet_pct, session_resets_in, weekly_resets_at,
+         estimated_weekly_limit, calibrated_at, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?, CASE WHEN ? IS NOT NULL THEN datetime('now') ELSE NULL END, datetime('now'))
+      ON CONFLICT(id) DO UPDATE SET
+        session_pct              = excluded.session_pct,
+        weekly_all_pct           = excluded.weekly_all_pct,
+        weekly_sonnet_pct        = excluded.weekly_sonnet_pct,
+        session_resets_in        = excluded.session_resets_in,
+        weekly_resets_at         = excluded.weekly_resets_at,
+        estimated_weekly_limit   = COALESCE(excluded.estimated_weekly_limit, claude_web_limits.estimated_weekly_limit),
+        calibrated_at            = CASE WHEN excluded.estimated_weekly_limit IS NOT NULL THEN datetime('now') ELSE claude_web_limits.calibrated_at END,
+        updated_at               = excluded.updated_at
+    `).run(
+      session_pct       ?? 0,
+      weekly_all_pct    ?? 0,
+      weekly_sonnet_pct ?? 0,
+      session_resets_in || '',
+      weekly_resets_at  || '',
+      estimated_weekly_limit,
+      estimated_weekly_limit,
+    );
+
+    res.json({ ok: true, estimated_weekly_limit });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/claude-usage', (req, res) => {
+  try {
+    const usage = getClaudeUsage();
+    res.json(usage || {
+      session: { contextTokens: 0, outputTokens: 0, limit: CLAUDE_LIMITS.sessionOutputTokens, percent: 0 },
+      today:   { inputTokens: 0, outputTokens: 0, total: 0 },
+      week:    { inputTokens: 0, outputTokens: 0, total: 0, limit: CLAUDE_LIMITS.weeklyOutputTokens, percent: 0 },
+      models:  [],
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

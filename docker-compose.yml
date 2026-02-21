@@ -12,6 +12,7 @@ services:
     volumes:
       - /home/kai/.openclaw/workspace:/workspace:rw
       - /home/kai/projects/kai-doc-pwa/data:/app/data:rw
+      - /home/kai/.openclaw/agents:/home/kai/.openclaw/agents:ro
     environment:
       - WORKSPACE_ROOT=/workspace
       - JWT_SECRET=kai-doc-pwa-secret-2026
@@ -19,3 +20,5 @@ services:
       - TELEGRAM_BOT_TOKEN=8291237173:AAElzKvQHvIjVQZ8Pm2yaBFdoXB9aiRKqik
       - TELEGRAM_CHAT_ID=8314284665
       - PHYSICAL_DISK_GB=914
+      - HOME=/home/kai
+      - OPENCLAW_GATEWAY_TOKEN=b2348138eb8d24617942e09e209ebecd7817dfddf9754518

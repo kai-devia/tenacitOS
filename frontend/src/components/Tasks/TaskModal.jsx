@@ -8,6 +8,7 @@ const STATUSES = [
 
 const PRIORITIES = ['Alta', 'Medio', 'Baja'];
 const EFFORTS = ['Pequeño', 'Medio', 'Grande'];
+const TASK_TYPES = ['Feature', 'Bug', 'Mejora', 'Investigación', 'Diseño', 'Documentación', 'Otro'];
 
 const EMPTY = {
   title: '',
@@ -56,12 +57,15 @@ export default function TaskModal({ task, initialStatus, onSave, onClose, onDele
 
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+
+        {/* Header — fijo arriba */}
         <div className={styles.modalHeader}>
-          <h2>{task ? '✏️ Editar Tarea' : '➕ Nueva Tarea'}</h2>
+          <h2 className={styles.modalTitle}>{task ? 'Editar Tarea' : 'Nueva Tarea'}</h2>
           <button className={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
 
+        {/* Formulario — scrollable */}
         <form onSubmit={handleSubmit} className={styles.modalForm}>
           {error && <div className={styles.formError}>{error}</div>}
 
@@ -86,7 +90,8 @@ export default function TaskModal({ task, initialStatus, onSave, onClose, onDele
             />
           </div>
 
-          <div className={styles.formRow}>
+          {/* Selectores en columna en móvil, fila en desktop */}
+          <div className={styles.formGrid}>
             <div className={styles.formGroup}>
               <label>Estado</label>
               <select value={form.status} onChange={set('status')}>
@@ -113,28 +118,26 @@ export default function TaskModal({ task, initialStatus, onSave, onClose, onDele
                 ))}
               </select>
             </div>
-          </div>
 
-          <div className={styles.formRow}>
             <div className={styles.formGroup}>
               <label>Tipo de tarea</label>
-              <input
-                type="text"
-                value={form.task_type}
-                onChange={set('task_type')}
-                placeholder="ej. Bug, Feature..."
-              />
+              <select value={form.task_type} onChange={set('task_type')}>
+                <option value="">— Sin tipo —</option>
+                {TASK_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
+          </div>
 
-            <div className={styles.formGroup}>
-              <label>Proyecto</label>
-              <input
-                type="text"
-                value={form.project}
-                onChange={set('project')}
-                placeholder="Nombre del proyecto"
-              />
-            </div>
+          <div className={styles.formGroup}>
+            <label>Proyecto</label>
+            <input
+              type="text"
+              value={form.project}
+              onChange={set('project')}
+              placeholder="Nombre del proyecto"
+            />
           </div>
 
           <div className={styles.formGroup}>
@@ -146,25 +149,28 @@ export default function TaskModal({ task, initialStatus, onSave, onClose, onDele
               placeholder="ej. Kai, Guille"
             />
           </div>
-
-          <div className={styles.modalActions}>
-            {onDelete && (
-              <button
-                type="button"
-                className={styles.deleteBtn}
-                onClick={() => { if (window.confirm('¿Eliminar esta tarea?')) onDelete(); }}
-              >
-                🗑️
-              </button>
-            )}
-            <button type="button" className={styles.cancelBtn} onClick={onClose}>
-              Cancelar
-            </button>
-            <button type="submit" className={styles.saveBtn} disabled={saving}>
-              {saving ? 'Guardando...' : '💾 Guardar'}
-            </button>
-          </div>
         </form>
+
+        {/* Acciones — fijas abajo */}
+        <div className={styles.modalActions}>
+          {onDelete && (
+            <button
+              type="button"
+              className={styles.deleteBtn}
+              onClick={() => { if (window.confirm('¿Eliminar esta tarea?')) onDelete(); }}
+            >
+              Eliminar
+            </button>
+          )}
+          <button
+            type="button"
+            className={styles.saveBtn}
+            disabled={saving}
+            onClick={handleSubmit}
+          >
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
       </div>
     </div>
   );

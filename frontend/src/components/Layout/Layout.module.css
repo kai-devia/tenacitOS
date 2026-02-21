@@ -16,10 +16,9 @@
   flex: 1;
   overflow-y: auto;
   background: var(--bg-base);
-  /* Remove default padding — each section handles its own */
+  min-height: 0;
 }
 
-/* On mobile: add bottom padding for the bottom nav bar */
 @media (max-width: 768px) {
   .content {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0));

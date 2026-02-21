@@ -2,17 +2,12 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-// Data directory — uses /app/data in Docker (mounted volume), or ./data in dev
 const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
-
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const dbPath = path.join(dataDir, 'kai_doc.db');
 const db = new Database(dbPath);
 
-// WAL mode for better write performance
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
@@ -54,12 +49,57 @@ db.exec(`
     created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
   );
+
+  -- Acumulado diario de tokens de Claude
+  CREATE TABLE IF NOT EXISTS claude_daily_usage (
+    date          TEXT PRIMARY KEY,
+    input_tokens  INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0
+  );
+
+  -- Historial del chat PWA
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    role       TEXT NOT NULL,   -- 'user' | 'assistant'
+    content    TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Último snapshot leído de sessions.json (para calcular deltas)
+  CREATE TABLE IF NOT EXISTS claude_usage_snapshot (
+    id            INTEGER PRIMARY KEY CHECK (id = 1),
+    input_tokens  INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    captured_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Límites manuales de claude.ai (el usuario los actualiza desde settings)
+  CREATE TABLE IF NOT EXISTS claude_web_limits (
+    id                       INTEGER PRIMARY KEY CHECK (id = 1),
+    session_pct              INTEGER NOT NULL DEFAULT 0,
+    weekly_all_pct           INTEGER NOT NULL DEFAULT 0,
+    weekly_sonnet_pct        INTEGER NOT NULL DEFAULT 0,
+    session_resets_in        TEXT    DEFAULT '',
+    weekly_resets_at         TEXT    DEFAULT '',
+    estimated_weekly_limit   INTEGER DEFAULT NULL,
+    calibrated_at            TEXT    DEFAULT NULL,
+    updated_at               TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
-// ─── OTP cleanup: remove expired codes on startup ─────────────────────────
+// ─── Runtime migrations (ALTER TABLE para columnas añadidas después) ──────
+const alterMigrations = [
+  `ALTER TABLE claude_web_limits ADD COLUMN estimated_weekly_limit INTEGER DEFAULT NULL`,
+  `ALTER TABLE claude_web_limits ADD COLUMN calibrated_at TEXT DEFAULT NULL`,
+];
+for (const sql of alterMigrations) {
+  try { db.exec(sql); } catch { /* column already exists — ignore */ }
+}
+
+// ─── Cleanup ───────────────────────────────────────────────────────────────
 db.prepare("DELETE FROM otp_codes WHERE expires_at < datetime('now')").run();
 
-// ─── Seed initial events if table is empty ────────────────────────────────
+// ─── Seed ──────────────────────────────────────────────────────────────────
 const eventsCount = db.prepare('SELECT COUNT(*) as count FROM events').get();
 if (eventsCount.count === 0) {
   db.prepare(`
@@ -76,6 +116,6 @@ if (eventsCount.count === 0) {
   console.log('📦 DB seeded: initial event created');
 }
 
-console.log(`✅ SQLite database ready at ${dbPath}`);
+console.log(`✅ SQLite ready at ${dbPath}`);
 
 module.exports = db;

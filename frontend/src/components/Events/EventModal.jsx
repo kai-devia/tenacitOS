@@ -30,7 +30,7 @@ export default function EventModal({ event, onSave, onClose, onDelete }) {
     setForm((f) => ({ ...f, [field]: e.target.value }));
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!form.name.trim()) {
       setError('El nombre es requerido');
       return;
@@ -49,12 +49,15 @@ export default function EventModal({ event, onSave, onClose, onDelete }) {
 
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+
+        {/* Header — fijo arriba */}
         <div className={styles.modalHeader}>
-          <h2>{event ? '✏️ Editar Evento' : '➕ Nuevo Evento'}</h2>
+          <h2 className={styles.modalTitle}>{event ? 'Editar Pulso' : 'Nuevo Pulso'}</h2>
           <button className={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
 
+        {/* Formulario — scrollable */}
         <form onSubmit={handleSubmit} className={styles.modalForm}>
           {error && <div className={styles.formError}>{error}</div>}
 
@@ -64,7 +67,7 @@ export default function EventModal({ event, onSave, onClose, onDelete }) {
               type="text"
               value={form.name}
               onChange={set('name')}
-              placeholder="Nombre del evento"
+              placeholder="Nombre del pulso"
               autoFocus
             />
           </div>
@@ -74,12 +77,12 @@ export default function EventModal({ event, onSave, onClose, onDelete }) {
             <textarea
               value={form.description}
               onChange={set('description')}
-              placeholder="Descripción del evento"
+              placeholder="Descripción del pulso"
               rows={3}
             />
           </div>
 
-          <div className={styles.formRow}>
+          <div className={styles.formGrid}>
             <div className={styles.formGroup}>
               <label>Estado</label>
               <select value={form.status} onChange={set('status')}>
@@ -97,9 +100,7 @@ export default function EventModal({ event, onSave, onClose, onDelete }) {
                 ))}
               </select>
             </div>
-          </div>
 
-          <div className={styles.formRow}>
             <div className={styles.formGroup}>
               <label>Owner</label>
               <input
@@ -116,29 +117,32 @@ export default function EventModal({ event, onSave, onClose, onDelete }) {
                 type="text"
                 value={form.schedule}
                 onChange={set('schedule')}
-                placeholder="ej. cada 30 min, diario 9am"
+                placeholder="ej. cada 30 min"
               />
             </div>
           </div>
-
-          <div className={styles.modalActions}>
-            {onDelete && (
-              <button
-                type="button"
-                className={styles.deleteBtn}
-                onClick={() => { if (window.confirm('¿Eliminar este pulso?')) onDelete(); }}
-              >
-                🗑️
-              </button>
-            )}
-            <button type="button" className={styles.cancelBtn} onClick={onClose}>
-              Cancelar
-            </button>
-            <button type="submit" className={styles.saveBtn} disabled={saving}>
-              {saving ? 'Guardando...' : '💾 Guardar'}
-            </button>
-          </div>
         </form>
+
+        {/* Acciones — fijas abajo */}
+        <div className={styles.modalActions}>
+          {onDelete && (
+            <button
+              type="button"
+              className={styles.deleteBtn}
+              onClick={() => { if (window.confirm('¿Eliminar este pulso?')) onDelete(); }}
+            >
+              Eliminar
+            </button>
+          )}
+          <button
+            type="button"
+            className={styles.saveBtn}
+            disabled={saving}
+            onClick={handleSubmit}
+          >
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
       </div>
     </div>
   );
