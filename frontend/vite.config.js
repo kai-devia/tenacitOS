@@ -14,9 +14,9 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
       },
       manifest: {
-        name: 'KAI DOC PWA',
-        short_name: 'KaiDoc',
-        description: 'Ventana a la mente de Kai — visor/editor de contexto y memoria',
+        name: 'KAI',
+        short_name: 'KAI',
+        description: 'Tu mano derecha técnica',
         theme_color: '#7c6af7',
         background_color: '#0d0d0d',
         display: 'standalone',

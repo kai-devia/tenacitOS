@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="#111118"/>
+  <!-- Outer ring accent -->
+  <circle cx="50" cy="50" r="48" fill="none" stroke="#7c6af7" stroke-width="1.5" opacity="0.6"/>
+
+  <!-- K — vertical bar -->
+  <rect x="26" y="22" width="8" height="56" fill="#e2e2e2" rx="2"/>
+
+  <!-- K — upper arm (white) -->
+  <line x1="34" y1="50" x2="68" y2="22" stroke="#e2e2e2" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- K — lower arm (violet — "the one that looks forward") -->
+  <line x1="34" y1="50" x2="68" y2="78" stroke="#7c6af7" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- Circuit dots at the tips -->
+  <circle cx="68" cy="22" r="3.5" fill="#e2e2e2"/>
+  <circle cx="68" cy="78" r="5" fill="#7c6af7"/>
+
+  <!-- Subtle pulse arc (identity signature) -->
+  <path d="M 18 72 Q 26 62 30 72 Q 34 82 42 72" fill="none" stroke="#7c6af7" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+</svg>

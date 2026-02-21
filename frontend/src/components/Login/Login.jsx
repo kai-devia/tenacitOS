@@ -66,9 +66,11 @@ export default function Login() {
   return (
     <div className={styles.container}>
       <div className={styles.card}>
-        <div className={styles.logo}>🧠</div>
-        <h1 className={styles.title}>KAI DOC</h1>
-        <p className={styles.subtitle}>Ventana a la mente de Kai</p>
+        <div className={styles.logo}>
+          <img src="/kai-avatar.svg" alt="KAI" width="80" height="80" />
+        </div>
+        <h1 className={styles.title}>KAI</h1>
+        <p className={styles.subtitle}>Tu mano derecha técnica</p>
 
         {error && <div className={styles.error}>{error}</div>}
         {success && step === 'verify' && (

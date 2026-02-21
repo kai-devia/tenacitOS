@@ -15,8 +15,8 @@ export default function Header({ isConnected, onMenuClick, showMenuButton }) {
         </button>
       )}
       <div className={styles.title}>
-        <span className={styles.logo}>🧠</span>
-        <span className={styles.text}>KAI DOC</span>
+        <img src="/kai-avatar.svg" alt="KAI" className={styles.logo} width="28" height="28" />
+        <span className={styles.text}>KAI</span>
       </div>
 
       <div className={styles.actions}>
