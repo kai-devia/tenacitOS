@@ -7,12 +7,15 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Backend con frontend dist embebido
-FROM node:20-alpine
+FROM node:20-bookworm
 # Build tools needed for better-sqlite3 native bindings
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+# Copy package files first
 COPY backend/package*.json ./
-RUN npm install --omit=dev
+# Install and rebuild native modules inside Docker (ensure GLIBC compatibility)
+RUN npm install --no-optional && npm rebuild
+# Now copy the backend source
 COPY backend/ ./
 COPY --from=frontend-build /app/frontend/dist ./public
 ENV NODE_ENV=production

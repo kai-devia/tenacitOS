@@ -206,6 +206,16 @@
 .sendBtn:hover:not(:disabled) { background: var(--accent-hover); }
 .sendBtn:disabled { opacity: 0.35; cursor: not-allowed; }
 
+/* Recording state: red with pulse animation */
+.recording {
+  background: #ef4444 !important;
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.1); }
+}
+
 /* Badge de mensajes en cola */
 .pendingBadge {
   position: absolute;
