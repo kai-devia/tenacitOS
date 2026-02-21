@@ -1,8 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getToken } from '../../api/client';
+import { marked } from 'marked';
 import styles from './Chat.module.css';
 
 const API_BASE = '/api';
+
+// Configure marked for inline rendering
+marked.setOptions({ breaks: true, gfm: true });
+
+function renderMarkdown(text) {
+  return { __html: marked.parse(text) };
+}
 
 function Message({ msg, isStreaming }) {
   const isUser = msg.role === 'user';
@@ -11,7 +19,11 @@ function Message({ msg, isStreaming }) {
       {!isUser && <div className={styles.avatar}>K</div>}
       <div className={`${styles.bubble} ${isUser ? styles.bubbleUser : styles.bubbleAssistant}`}>
         <div className={styles.bubbleText}>
-          {msg.content}
+          {isUser ? (
+            msg.content
+          ) : (
+            <div className={styles.markdownContent} dangerouslySetInnerHTML={renderMarkdown(msg.content)} />
+          )}
           {isStreaming && <span className={styles.cursor} />}
         </div>
         {msg.created_at && (
@@ -57,13 +69,31 @@ export default function Chat() {
       });
   }, [scrollToBottom]);
 
+  // Unified scroll effect for all cases
   useEffect(() => {
-    if (!streaming) scrollToBottom();
-  }, [messages, streaming, scrollToBottom]);
+    scrollToBottom();
+  }, [messages.length, streaming, scrollToBottom]);
 
+  // Bug 1: Handle mobile keyboard with visualViewport API
   useEffect(() => {
-    if (streaming) scrollToBottom();
-  }, [streamingText, streaming, scrollToBottom]);
+    const vv = window.visualViewport;
+    if (!vv) return;
+    
+    const handler = () => {
+      const el = document.querySelector('[data-chat-messages]');
+      if (el) {
+        el.style.maxHeight = `${vv.height - 120}px`; // header ~50 + input ~70
+      }
+    };
+    
+    vv.addEventListener('resize', handler);
+    vv.addEventListener('scroll', handler);
+    
+    return () => {
+      vv.removeEventListener('resize', handler);
+      vv.removeEventListener('scroll', handler);
+    };
+  }, []);
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -73,6 +103,9 @@ export default function Chat() {
     setStreaming(true);
     setStreamingText('');
     setError(null);
+    
+    // Bug 2: Scroll immediately before fetch
+    setTimeout(() => scrollToBottom(false), 50);
 
     const token = getToken();
     const controller = new AbortController();
@@ -115,6 +148,10 @@ export default function Chat() {
             } else if (event.type === 'delta') {
               accumulated += event.content;
               setStreamingText(accumulated);
+              // Bug 2: Scroll every ~30 chars or if short
+              if (accumulated.length % 30 === 0 || accumulated.length < 50) {
+                scrollToBottom();
+              }
             } else if (event.type === 'done') {
               setMessages(prev => [...prev, event.message]);
               setStreamingText('');
@@ -184,7 +221,7 @@ export default function Chat() {
       </div>
 
       {/* Messages */}
-      <div className={styles.messages}>
+      <div className={styles.messages} data-chat-messages>
         {messages.length === 0 && !streaming && (
           <div className={styles.empty}>
             <p className={styles.emptyTitle}>Kai está listo</p>
