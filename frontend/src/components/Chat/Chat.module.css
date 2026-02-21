@@ -162,11 +162,81 @@
 .inputArea {
   flex-shrink: 0;
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   padding: 10px 12px;
   border-top: 1px solid var(--border);
   background: var(--bg-surface);
+}
+
+.inputRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+/* Image preview strip */
+.imagePreviewRow {
+  display: flex;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.imagePreviewWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.imagePreview {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+}
+
+.imageRemoveBtn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ff4444;
+  border: none;
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+/* Image button */
+.imageBtn {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.imageBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.imageBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .input {
   flex: 1;
@@ -296,3 +366,28 @@
   margin: 6px 0;
 }
 .markdownContent pre code { background: none; padding: 0; }
+
+/* ── Image messages ──────────────────────────────────────────────────────── */
+.imageMsgContent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chatImage {
+  max-width: 260px;
+  max-height: 260px;
+  border-radius: 10px;
+  object-fit: contain;
+  display: block;
+}
+
+.imagePlaceholder {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.imageCaption {
+  font-size: 0.9rem;
+}

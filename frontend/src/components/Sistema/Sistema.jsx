@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
+import { RefreshCw, Cpu, MemoryStick, HardDrive, Clock, Activity } from 'lucide-react';
 import { getToken } from '../../api/client';
 import styles from './Sistema.module.css';
 
 const API_BASE = '/api';
 const REFRESH_INTERVAL = 5000;
 
+// ── Formatters ─────────────────────────────────────────────────────────────
 function formatUptime(seconds) {
-  const days = Math.floor(seconds / 86400);
+  const days  = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  if (days > 0) return `${days}d ${hours}h`;
+  const mins  = Math.floor((seconds % 3600) / 60);
+  if (days > 0)  return `${days}d ${hours}h`;
   if (hours > 0) return `${hours}h ${mins}m`;
   return `${mins}m`;
 }
@@ -29,178 +31,210 @@ function fmtModel(m) {
 }
 
 function fmtK(n) {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  if (!n) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1000)      return `${(n / 1000).toFixed(1)}k`;
   return String(n);
 }
 
 function timeAgo(dateStr) {
   if (!dateStr) return null;
   const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
-  if (diff < 60) return 'hace un momento';
+  if (diff < 60)   return 'hace un momento';
   if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
   return `hace ${Math.floor(diff / 3600)}h`;
 }
 
-function ProgressBar({ percent, color }) {
-  const c = color || (
-    percent >= 85 ? 'var(--danger)' :
-    percent >= 60 ? 'var(--warning)' :
-    'var(--success)'
-  );
+// ── Progress bar ───────────────────────────────────────────────────────────
+function Bar({ percent }) {
+  const color =
+    percent >= 85 ? 'var(--danger)'  :
+    percent >= 60 ? 'var(--warning)' : 'var(--success)';
   return (
-    <div className={styles.trackThin}>
-      <div className={styles.fill}
-        style={{ width: `${Math.min(percent, 100)}%`, background: c }} />
+    <div className={styles.track}>
+      <div className={styles.fill} style={{ width: `${Math.min(percent, 100)}%`, background: color }} />
     </div>
   );
 }
 
-function CompactCard({ label, value, sub, percent }) {
+// ── System metric card ─────────────────────────────────────────────────────
+function MetricCard({ icon: Icon, label, value, sub, percent }) {
   return (
-    <div className={styles.card}>
-      <div className={styles.cardLabel}>{label}</div>
-      <div className={styles.cardValue}>{value}</div>
-      {sub && <div className={styles.cardSub}>{sub}</div>}
-      {percent !== undefined && <ProgressBar percent={percent} />}
+    <div className={styles.metricCard}>
+      <div className={styles.metricTop}>
+        <Icon size={14} className={styles.metricIcon} />
+        <span className={styles.metricLabel}>{label}</span>
+      </div>
+      <div className={styles.metricValue}>{value}</div>
+      {sub && <div className={styles.metricSub}>{sub}</div>}
+      {percent !== undefined && <Bar percent={percent} />}
     </div>
   );
 }
 
-// ── Claude limits editor ───────────────────────────────────────────────────
-function ClaudeWebLimits({ limits, onSave }) {
-  const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({
-    session_pct: limits?.session_pct ?? 0,
-    weekly_all_pct: limits?.weekly_all_pct ?? 0,
-    weekly_sonnet_pct: limits?.weekly_sonnet_pct ?? 0,
-    session_resets_in: limits?.session_resets_in ?? '',
-    weekly_resets_at: limits?.weekly_resets_at ?? '',
-  });
-
-  useEffect(() => {
-    setForm({
-      session_pct: limits?.session_pct ?? 0,
-      weekly_all_pct: limits?.weekly_all_pct ?? 0,
-      weekly_sonnet_pct: limits?.weekly_sonnet_pct ?? 0,
-      session_resets_in: limits?.session_resets_in ?? '',
-      weekly_resets_at: limits?.weekly_resets_at ?? '',
-    });
-  }, [limits]);
-
-  const handleSave = async () => {
-    await onSave(form);
-    setEditing(false);
-  };
-
-  if (editing) {
-    return (
-      <div className={styles.claudeEditor}>
-        <div className={styles.editorTitle}>Actualizar desde claude.ai/settings</div>
-        <div className={styles.editorHint}>
-          Al introducir el % semanal, el sistema calcula automáticamente el límite total estimado usando los tokens acumulados.
-        </div>
-
-        <div className={styles.editorGrid}>
-          <div className={styles.editorField}>
-            <label>Sesión %</label>
-            <input type="number" min="0" max="100" value={form.session_pct}
-              onChange={e => setForm(f => ({ ...f, session_pct: +e.target.value }))} />
-          </div>
-          <div className={styles.editorField}>
-            <label>Se restablece en</label>
-            <input type="text" placeholder="ej. 4h 48min" value={form.session_resets_in}
-              onChange={e => setForm(f => ({ ...f, session_resets_in: e.target.value }))} />
-          </div>
-          <div className={styles.editorField}>
-            <label>Semana — todos %</label>
-            <input type="number" min="0" max="100" value={form.weekly_all_pct}
-              onChange={e => setForm(f => ({ ...f, weekly_all_pct: +e.target.value }))} />
-          </div>
-          <div className={styles.editorField}>
-            <label>Solo Sonnet %</label>
-            <input type="number" min="0" max="100" value={form.weekly_sonnet_pct}
-              onChange={e => setForm(f => ({ ...f, weekly_sonnet_pct: +e.target.value }))} />
-          </div>
-          <div className={styles.editorField}>
-            <label>Semana se restablece</label>
-            <input type="text" placeholder="ej. jue 17:59" value={form.weekly_resets_at}
-              onChange={e => setForm(f => ({ ...f, weekly_resets_at: e.target.value }))} />
-          </div>
-        </div>
-
-        <div className={styles.editorActions}>
-          <button className={styles.cancelEditorBtn} onClick={() => setEditing(false)}>Cancelar</button>
-          <button className={styles.saveEditorBtn} onClick={handleSave}>Guardar y calibrar</button>
-        </div>
+// ── Session renewal form ───────────────────────────────────────────────────
+function SessionRenewal({ onRenew, renewing }) {
+  const [key, setKey] = useState('');
+  return (
+    <div className={styles.renewalBox}>
+      <div className={styles.renewalTitle}>Sesión de Claude.ai expirada</div>
+      <div className={styles.renewalDesc}>
+        Introduce el nuevo <code>sessionKey</code> para restablecer la conexión.
       </div>
-    );
-  }
+      <input
+        className={styles.renewalInput}
+        type="text"
+        placeholder="sk-ant-sid02-..."
+        value={key}
+        onChange={e => setKey(e.target.value)}
+        spellCheck={false}
+      />
+      <button
+        className={styles.renewalBtn}
+        disabled={!key.startsWith('sk-ant-') || renewing}
+        onClick={() => onRenew(key)}
+      >
+        {renewing ? 'Actualizando...' : 'Actualizar sesión'}
+      </button>
+      <p className={styles.renewalHint}>
+        Para obtenerlo: abre <strong>claude.ai</strong> → F12 → Application → Cookies → claude.ai → copia el valor de <code>sessionKey</code>
+      </p>
+    </div>
+  );
+}
 
-  const hasData = limits?.updated_at;
+// ── Claude plan usage section ──────────────────────────────────────────────
+function ClaudePlan({ limits, onSync, syncing, onRenew, renewing }) {
+  const hasData   = limits?.updated_at;
+  const isExpired = limits?.session_expired;
 
   return (
-    <div className={styles.claudeWebSection}>
-      <div className={styles.claudeWebHeader}>
-        <span className={styles.claudeWebTitle}>Claude.ai — Límites de plan</span>
-        <button className={styles.updateBtn} onClick={() => setEditing(true)}>
-          Actualizar
-        </button>
+    <div className={styles.section}>
+      <div className={styles.sectionHeader}>
+        <span className={styles.sectionTitle}>Claude.ai — Plan</span>
+        <div className={styles.sectionActions}>
+          {hasData && !isExpired && <span className={styles.syncBadge}>Auto-sync</span>}
+          {isExpired && <span className={styles.expiredBadge}>Sesión expirada</span>}
+          {!isExpired && (
+            <button
+              className={styles.syncBtn}
+              onClick={onSync}
+              disabled={syncing}
+              title="Sincronizar ahora"
+            >
+              <RefreshCw size={13} className={syncing ? styles.spinning : ''} />
+              {syncing ? 'Sincronizando...' : 'Sincronizar'}
+            </button>
+          )}
+        </div>
       </div>
 
-      {!hasData ? (
-        <p className={styles.noData}>Sin datos — pulsa Actualizar e introduce los % de claude.ai/settings</p>
+      {isExpired ? (
+        <SessionRenewal onRenew={onRenew} renewing={renewing} />
+      ) : !hasData ? (
+        <p className={styles.noData}>Sincronizando por primera vez...</p>
       ) : (
-        <>
+        <div className={styles.limitsList}>
           {/* Sesión */}
-          <div className={styles.limitRow}>
-            <div className={styles.limitRowTop}>
-              <span className={styles.limitLabel}>Sesión actual</span>
+          <div className={styles.limitItem}>
+            <div className={styles.limitMeta}>
+              <span className={styles.limitName}>Sesión actual</span>
               <span className={styles.limitPct}>{limits.session_pct}%</span>
             </div>
-            <ProgressBar percent={limits.session_pct} />
+            <Bar percent={limits.session_pct} />
             {limits.session_resets_in && (
-              <span className={styles.limitSub}>Se restablece en {limits.session_resets_in}</span>
+              <span className={styles.limitNote}>Resetea en {limits.session_resets_in}</span>
             )}
           </div>
 
-          {/* Semana — todos los modelos */}
-          <div className={styles.limitRow}>
-            <div className={styles.limitRowTop}>
-              <span className={styles.limitLabel}>Semana — todos los modelos</span>
+          {/* Semana todos */}
+          <div className={styles.limitItem}>
+            <div className={styles.limitMeta}>
+              <span className={styles.limitName}>Semana — todos los modelos</span>
               <span className={styles.limitPct}>{limits.weekly_all_pct}%</span>
             </div>
-            <ProgressBar percent={limits.weekly_all_pct} />
-          </div>
-
-          {/* Semana — Sonnet */}
-          <div className={styles.limitRow}>
-            <div className={styles.limitRowTop}>
-              <span className={styles.limitLabel}>Semana — solo Sonnet</span>
-              <span className={styles.limitPct}>{limits.weekly_sonnet_pct}%</span>
-            </div>
-            <ProgressBar percent={limits.weekly_sonnet_pct} />
+            <Bar percent={limits.weekly_all_pct} />
             {limits.weekly_resets_at && (
-              <span className={styles.limitSub}>Se restablece {limits.weekly_resets_at}</span>
+              <span className={styles.limitNote}>Resetea {limits.weekly_resets_at}</span>
             )}
           </div>
 
-          <span className={styles.limitUpdated}>Actualizado {timeAgo(limits.updated_at)}</span>
-        </>
+          {/* Sonnet */}
+          <div className={styles.limitItem}>
+            <div className={styles.limitMeta}>
+              <span className={styles.limitName}>Semana — solo Sonnet</span>
+              <span className={styles.limitPct}>{limits.weekly_sonnet_pct}%</span>
+            </div>
+            <Bar percent={limits.weekly_sonnet_pct} />
+          </div>
+
+          <span className={styles.updatedNote}>Actualizado {timeAgo(limits.updated_at)}</span>
+        </div>
       )}
     </div>
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────
-export default function Sistema() {
-  const [metrics, setMetrics]   = useState(null);
-  const [claude, setClaude]     = useState(null);
-  const [webLimits, setWebLimits] = useState(null);
-  const [error, setError]       = useState(null);
-  const [loading, setLoading]   = useState(true);
-  const [lastUpdated, setLastUpdated] = useState(null);
+// ── OpenClaw token stats ───────────────────────────────────────────────────
+function TokenStats({ claude }) {
+  if (!claude) return null;
+  const stats = [
+    { label: 'Contexto sesión',   value: fmtK(claude.session?.contextTokens || 0) },
+    { label: 'Salida sesión',     value: fmtK(claude.session?.outputTokens   || 0) },
+    { label: 'Total hoy',         value: fmtK(claude.today?.total            || 0) },
+    { label: 'Total semana',      value: fmtK(claude.week?.total             || 0) },
+  ];
 
-  const headers = useCallback(() => ({
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionHeader}>
+        <span className={styles.sectionTitle}>OpenClaw — Tokens API</span>
+        {claude.models?.length > 0 && (
+          <div className={styles.modelChips}>
+            {claude.models.map(m => (
+              <span key={m} className={styles.chip}>{fmtModel(m)}</span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className={styles.tokenGrid}>
+        {stats.map(({ label, value }) => (
+          <div key={label} className={styles.tokenStat}>
+            <span className={styles.tokenVal}>{value}</span>
+            <span className={styles.tokenLabel}>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {claude.week?.limit && (
+        <div className={styles.weekBar}>
+          <div className={styles.limitMeta}>
+            <span className={styles.limitName}>Semana estimada</span>
+            <span className={styles.limitPct}>{claude.week.percent ?? 0}% <em className={styles.approx}>aprox.</em></span>
+          </div>
+          <Bar percent={claude.week.percent || 0} />
+          <span className={styles.limitNote}>
+            {fmtK(claude.week.total)} de ~{fmtK(claude.week.limit)} tokens estimados
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+export default function Sistema() {
+  const [metrics,    setMetrics]   = useState(null);
+  const [claude,     setClaude]    = useState(null);
+  const [webLimits,  setWebLimits] = useState(null);
+  const [error,      setError]     = useState(null);
+  const [loading,    setLoading]   = useState(true);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [syncing,    setSyncing]   = useState(false);
+  const [renewing,   setRenewing]  = useState(false);
+
+  const auth = useCallback(() => ({
     Authorization: `Bearer ${getToken()}`,
     'Content-Type': 'application/json',
   }), []);
@@ -208,30 +242,58 @@ export default function Sistema() {
   const fetchAll = useCallback(async () => {
     try {
       const [mRes, cRes, wRes] = await Promise.all([
-        fetch(`${API_BASE}/system/metrics`,       { headers: headers() }),
-        fetch(`${API_BASE}/system/claude-usage`,  { headers: headers() }),
-        fetch(`${API_BASE}/system/claude-web-limits`, { headers: headers() }),
+        fetch(`${API_BASE}/system/metrics`,           { headers: auth() }),
+        fetch(`${API_BASE}/system/claude-usage`,      { headers: auth() }),
+        fetch(`${API_BASE}/system/claude-web-limits`, { headers: auth() }),
       ]);
       if (!mRes.ok) throw new Error('Error cargando métricas');
       setMetrics(await mRes.json());
       if (cRes.ok) setClaude(await cRes.json());
       if (wRes.ok) setWebLimits(await wRes.json());
       setError(null);
-      setLastUpdated(new Date());
+      setLastUpdate(new Date());
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [headers]);
+  }, [auth]);
 
-  const saveLimits = async (data) => {
-    await fetch(`${API_BASE}/system/claude-web-limits`, {
-      method: 'PATCH',
-      headers: headers(),
-      body: JSON.stringify(data),
-    });
-    await fetchAll();
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch(`${API_BASE}/system/sync-claude`, {
+        method: 'POST',
+        headers: auth(),
+      });
+      if (res.ok) {
+        await new Promise(r => setTimeout(r, 500));
+        await fetchAll();
+      }
+    } catch (err) {
+      console.error('Sync error:', err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleRenew = async (sessionKey) => {
+    setRenewing(true);
+    try {
+      const res = await fetch(`${API_BASE}/system/claude-session-key`, {
+        method: 'POST',
+        headers: auth(),
+        body: JSON.stringify({ sessionKey }),
+      });
+      if (res.ok) {
+        await new Promise(r => setTimeout(r, 1000));
+        await fetchAll();
+      }
+    } catch (err) {
+      console.error('Renew error:', err);
+    } finally {
+      setRenewing(false);
+    }
   };
 
   useEffect(() => {
@@ -240,7 +302,12 @@ export default function Sistema() {
     return () => clearInterval(id);
   }, [fetchAll]);
 
-  if (loading) return <div className={styles.centered}><div className={styles.spinner} /></div>;
+  if (loading) return (
+    <div className={styles.centered}>
+      <div className={styles.spinner} />
+    </div>
+  );
+
   if (error) return (
     <div className={styles.centered}>
       <p className={styles.errorText}>{error}</p>
@@ -252,71 +319,31 @@ export default function Sistema() {
 
   return (
     <div className={styles.wrapper}>
+      {/* Header */}
       <div className={styles.header}>
         <span className={styles.hostname}>{hostname}</span>
-        {lastUpdated && (
-          <span className={styles.lastUpdated}>{lastUpdated.toLocaleTimeString('es-ES')}</span>
+        {lastUpdate && (
+          <span className={styles.lastUpdated}>{lastUpdate.toLocaleTimeString('es-ES')}</span>
         )}
       </div>
 
-      {/* Grid 2x2 sistema */}
-      <div className={styles.grid}>
-        <CompactCard label="CPU" value={`${cpu.usage}%`}
+      {/* System metrics grid */}
+      <div className={styles.metricsGrid}>
+        <MetricCard icon={Cpu}         label="CPU"    value={`${cpu.usage}%`}
           sub={`${cpu.cores} núcleos · ${shortModel(cpu.model)}`} percent={cpu.usage} />
-        <CompactCard label="RAM" value={`${mbToGb(memory.used)} / ${mbToGb(memory.total)} GB`}
+        <MetricCard icon={MemoryStick} label="RAM"    value={`${mbToGb(memory.used)} / ${mbToGb(memory.total)} GB`}
           sub={`${memory.percent}% en uso`} percent={memory.percent} />
-        <CompactCard label="Disco" value={`${disk.used} / ${disk.total} GB`}
+        <MetricCard icon={HardDrive}   label="Disco"  value={`${disk.used} / ${disk.total} GB`}
           sub={`${disk.free} GB libres`} percent={disk.percent} />
-        <CompactCard label="Uptime" value={formatUptime(uptime)} sub="tiempo activo" />
+        <MetricCard icon={Clock}       label="Uptime" value={formatUptime(uptime)}
+          sub="tiempo activo" />
       </div>
 
-      {/* Claude.ai limits (manual) */}
-      <ClaudeWebLimits limits={webLimits} onSave={saveLimits} />
+      {/* Claude.ai plan usage */}
+      <ClaudePlan limits={webLimits} onSync={handleSync} syncing={syncing} onRenew={handleRenew} renewing={renewing} />
 
-      {/* OpenClaw API tokens */}
-      {claude && (
-        <div className={styles.claudeApiSection}>
-          <div className={styles.claudeApiHeader}>
-            <span className={styles.sectionLabel}>OpenClaw — tokens API</span>
-            {claude.models?.length > 0 && (
-              <div className={styles.claudeModels}>
-                {claude.models.map(m => (
-                  <span key={m} className={styles.modelChip}>{fmtModel(m)}</span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className={styles.claudeApiRow}>
-            <div className={styles.apiStat}>
-              <span className={styles.apiVal}>{fmtK(claude.session?.outputTokens || 0)}</span>
-              <span className={styles.apiLbl}>sesión salida</span>
-            </div>
-            <div className={styles.apiStat}>
-              <span className={styles.apiVal}>{fmtK(claude.today?.total || 0)}</span>
-              <span className={styles.apiLbl}>hoy total</span>
-            </div>
-            <div className={styles.apiStat}>
-              <span className={styles.apiVal}>{fmtK(claude.week?.total || 0)}</span>
-              <span className={styles.apiLbl}>semana total</span>
-            </div>
-          </div>
-
-          {/* Semana calibrada */}
-          {claude.week?.limit && (
-            <div className={styles.calibratedWeek}>
-              <div className={styles.limitRowTop}>
-                <span className={styles.limitLabel}>Semana estimada</span>
-                <span className={styles.limitPct}>{claude.week.percent ?? 0}% <span className={styles.approx}>aprox.</span></span>
-              </div>
-              <ProgressBar percent={claude.week.percent || 0} />
-              <span className={styles.limitSub}>
-                {fmtK(claude.week.total)} de ~{fmtK(claude.week.limit)} tokens estimados
-              </span>
-            </div>
-          )}
-        </div>
-      )}
+      {/* OpenClaw token stats */}
+      <TokenStats claude={claude} />
     </div>
   );
 }

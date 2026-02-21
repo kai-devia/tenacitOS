@@ -91,6 +91,14 @@ db.exec(`
 const alterMigrations = [
   `ALTER TABLE claude_web_limits ADD COLUMN estimated_weekly_limit INTEGER DEFAULT NULL`,
   `ALTER TABLE claude_web_limits ADD COLUMN calibrated_at TEXT DEFAULT NULL`,
+  `ALTER TABLE claude_web_limits ADD COLUMN session_expired INTEGER DEFAULT 0`,
+  `ALTER TABLE claude_web_limits ADD COLUMN session_key TEXT DEFAULT NULL`,
+  // Vault PIN storage
+  `CREATE TABLE IF NOT EXISTS vault_config (
+    id         INTEGER PRIMARY KEY CHECK (id = 1),
+    pin_hash   TEXT DEFAULT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
 ];
 for (const sql of alterMigrations) {
   try { db.exec(sql); } catch { /* column already exists — ignore */ }

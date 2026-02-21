@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { ImagePlus, X } from 'lucide-react';
 import { getToken } from '../../api/client';
 import { marked } from 'marked';
 import {
@@ -12,6 +13,7 @@ import {
 import { useStreamResponse } from './useStreamResponse';
 import { useAudioRecorder } from './useAudioRecorder';
 import styles from './Chat.module.css';
+import { localImageCache } from './imageCache';
 
 const API_BASE = '/api';
 marked.setOptions({ breaks: true, gfm: true });
@@ -25,18 +27,28 @@ export default function Chat() {
   const [streamText, setStreamText] = useState('');
   const [error, setError] = useState(null);
   const [pending, setPending] = useState(0);
+  // Image state
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
 
   // ── Refs ───────────────────────────────────────────────────────────────
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+  const imageInputRef = useRef(null);
   const queueRef = useRef([]);
   const busyRef = useRef(false);
+  // Tracks texts sent optimistically from this device, so WS broadcast doesn't duplicate them
+  const pendingTexts = useRef(new Set());
 
   // ── Hooks ──────────────────────────────────────────────────────────────
   const { sendRequest: sendSSE, abort: abortSSE } = useStreamResponse(
     (accumulated) => setStreamText(accumulated),
     (message) => {
-      setMessages((prev) => [...prev, message]);
+      setMessages((prev) => {
+        // Dedup: WS might have already added this message
+        if (prev.some((m) => m.id === message.id)) return prev;
+        return [...prev, message];
+      });
       setStreamText('');
       setStreaming(false);
     },
@@ -66,6 +78,49 @@ export default function Chat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages.length, streaming, streamText, scrollToBottom]);
+
+  // ── WebSocket: sync messages from other devices ───────────────────────
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+
+    const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws?token=${token}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'chat_message' && data.message?.id) {
+          const msg = data.message;
+
+          if (msg.role === 'user' && pendingTexts.current.has(msg.content)) {
+            // This is our own optimistic message coming back from the server
+            // Replace the optimistic entry (local-* id) with the real one
+            pendingTexts.current.delete(msg.content);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.role === 'user' &&
+                String(m.id).startsWith('local-') &&
+                m.content === msg.content
+                  ? msg
+                  : m
+              )
+            );
+          } else {
+            setMessages((prev) => {
+              // Only add if not already present (dedup by ID) — message from another device
+              if (prev.some((m) => m.id === msg.id)) return prev;
+              return [...prev, msg];
+            });
+          }
+        }
+      } catch {}
+    };
+
+    ws.onerror = () => {}; // Silently ignore WS errors
+
+    return () => ws.close();
+  }, []);
 
   useEffect(() => {
     fetch(`${API_BASE}/chat/history`, {
@@ -133,6 +188,7 @@ export default function Chat() {
     if (inputRef.current) inputRef.current.style.height = 'auto';
 
     // Optimistic update
+    pendingTexts.current.add(text);
     setMessages((prev) => [
       ...prev,
       {
@@ -251,6 +307,116 @@ export default function Chat() {
     }
   }, [audioBlob, clearAudioBlob, abortSSE]);
 
+  // ── Image Handlers ─────────────────────────────────────────────────────
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    // Use FileReader → data URL (doesn't need to be revoked)
+    const reader = new FileReader();
+    reader.onload = (ev) => setImagePreviewUrl(ev.target.result);
+    reader.readAsDataURL(file);
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const clearImage = useCallback(() => {
+    setImageFile(null);
+    setImagePreviewUrl(null);
+  }, []);
+
+  const sendImageMessage = useCallback(async () => {
+    if (!imageFile || streaming) return;
+
+    const caption = input.trim();
+    const dbContent = caption ? `[Imagen] ${caption}` : '[Imagen]';
+
+    setInput('');
+    if (inputRef.current) inputRef.current.style.height = 'auto';
+
+    // Optimistic message (show image + caption locally)
+    const localId = `local-${Date.now()}`;
+    const localPreview = imagePreviewUrl;
+    localImageCache.set(localId, localPreview);
+    pendingTexts.current.add(dbContent);
+
+    setMessages(prev => [...prev, {
+      id: localId,
+      role: 'user',
+      content: dbContent,
+      created_at: new Date().toISOString().replace('T', ' ').split('.')[0],
+    }]);
+
+    const savedFile = imageFile;
+    clearImage();
+
+    setStreaming(true);
+    setStreamText('');
+    setError(null);
+
+    const formData = new FormData();
+    formData.append('image', savedFile, savedFile.name);
+    if (caption) formData.append('message', caption);
+
+    try {
+      const res = await fetch(`${API_BASE}/chat/send-image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      let accumulated = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          let event;
+          try { event = JSON.parse(line.slice(5).trim()); } catch { continue; }
+
+          if (event.type === 'user_message') {
+            // Replace optimistic with real DB message, carry over image cache
+            localImageCache.set(event.message.id, localPreview);
+            localImageCache.delete(localId);
+            pendingTexts.current.delete(dbContent);
+            setMessages(prev => prev.map(m =>
+              m.id === localId ? event.message : m
+            ));
+          } else if (event.type === 'delta') {
+            accumulated += event.content;
+            setStreamText(accumulated);
+          } else if (event.type === 'done') {
+            setMessages(prev => {
+              if (prev.some(m => m.id === event.message.id)) return prev;
+              return [...prev, event.message];
+            });
+            setStreamText('');
+            setStreaming(false);
+          } else if (event.type === 'error') {
+            throw new Error(event.error);
+          }
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+      setStreamText('');
+      setStreaming(false);
+    }
+  }, [imageFile, imagePreviewUrl, input, streaming, clearImage]);
+
   // ── Input Handlers ─────────────────────────────────────────────────────
 
   const handleKeyDown = (e) => {
@@ -288,6 +454,7 @@ export default function Chat() {
   }
 
   const hasText = input.trim().length > 0;
+  const hasImage = !!imageFile;
 
   return (
     <div className={styles.wrapper}>
@@ -325,33 +492,77 @@ export default function Chat() {
         <div ref={bottomRef} />
       </div>
 
+      {/* Hidden file input for images */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleImageSelect}
+      />
+
       <div className={styles.inputArea}>
-        <textarea
-          ref={inputRef}
-          className={styles.input}
-          value={input}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder="Escribe un mensaje..."
-          rows={1}
-        />
-        {hasText ? (
-          <SendButton
-            pending={pending}
-            disabled={!input.trim()}
-            onClick={sendMessage}
-          />
-        ) : (
-          <AudioButton
-            isRecording={isRecording}
-            recordingTime={recordingTime}
-            hasAudio={!!audioBlob}
-            onStartRecord={startRecording}
-            onStopRecord={stopRecording}
-            onCancelRecord={cancelRecording}
-            onSendAudio={sendAudio}
-          />
+        {/* Image preview strip */}
+        {imagePreviewUrl && (
+          <div className={styles.imagePreviewRow}>
+            <div className={styles.imagePreviewWrap}>
+              <img src={imagePreviewUrl} alt="preview" className={styles.imagePreview} />
+              <button className={styles.imageRemoveBtn} onClick={clearImage} title="Quitar imagen">
+                <X size={12} />
+              </button>
+            </div>
+          </div>
         )}
+
+        <div className={styles.inputRow}>
+          <textarea
+            ref={inputRef}
+            className={styles.input}
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                hasImage ? sendImageMessage() : sendMessage();
+              } else {
+                handleKeyDown(e);
+              }
+            }}
+            placeholder={hasImage ? 'Añade un texto (opcional)...' : 'Escribe un mensaje...'}
+            rows={1}
+          />
+
+          {/* Image button — always visible unless recording audio */}
+          {!isRecording && !audioBlob && (
+            <button
+              className={styles.imageBtn}
+              onClick={() => imageInputRef.current?.click()}
+              title="Adjuntar imagen"
+              disabled={streaming}
+            >
+              <ImagePlus size={18} strokeWidth={1.5} />
+            </button>
+          )}
+
+          {/* Send / Audio buttons */}
+          {hasImage || hasText ? (
+            <SendButton
+              pending={pending}
+              disabled={streaming}
+              onClick={hasImage ? sendImageMessage : sendMessage}
+            />
+          ) : (
+            <AudioButton
+              isRecording={isRecording}
+              recordingTime={recordingTime}
+              hasAudio={!!audioBlob}
+              onStartRecord={startRecording}
+              onStopRecord={stopRecording}
+              onCancelRecord={cancelRecording}
+              onSendAudio={sendAudio}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

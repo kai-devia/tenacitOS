@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { marked } from 'marked';
 import styles from './Chat.module.css';
+import { localImageCache } from './imageCache';
 
 export const TypingIndicator = memo(() => (
   <div className={`${styles.msgRow} ${styles.msgRowAssistant}`}>
@@ -17,14 +18,28 @@ TypingIndicator.displayName = 'TypingIndicator';
 
 export const Message = memo(({ msg, isStreaming }) => {
   const isUser = msg.role === 'user';
-  
+  const hasImage = isUser && msg.content?.startsWith('[Imagen]');
+  const imageUrl = hasImage ? localImageCache.get(msg.id) : null;
+  const caption = hasImage ? msg.content.slice('[Imagen]'.length).trim() : null;
+
   return (
     <div className={`${styles.msgRow} ${isUser ? styles.msgRowUser : styles.msgRowAssistant}`}>
       {!isUser && <div className={styles.avatar}>K</div>}
       <div className={`${styles.bubble} ${isUser ? styles.bubbleUser : styles.bubbleAssistant}`}>
         <div className={styles.bubbleText}>
           {isUser ? (
-            msg.content
+            hasImage ? (
+              <div className={styles.imageMsgContent}>
+                {imageUrl ? (
+                  <img src={imageUrl} alt="imagen adjunta" className={styles.chatImage} />
+                ) : (
+                  <span className={styles.imagePlaceholder}>📷 Imagen</span>
+                )}
+                {caption && <span className={styles.imageCaption}>{caption}</span>}
+              </div>
+            ) : (
+              msg.content
+            )
           ) : (
             <div
               className={styles.markdownContent}

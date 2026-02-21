@@ -120,6 +120,14 @@
   gap: 2px;
 }
 
+.itemId {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
 .itemTitle {
   font-size: 0.95rem;
   font-weight: 500;

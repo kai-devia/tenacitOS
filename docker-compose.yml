@@ -13,6 +13,7 @@ services:
       - /home/kai/.openclaw/workspace:/workspace:rw
       - /home/kai/projects/kai-doc-pwa/data:/app/data:rw
       - /home/kai/.openclaw/agents:/home/kai/.openclaw/agents:ro
+      - /home/kai/.kai-secrets:/app/vault-secrets:rw
     environment:
       - WORKSPACE_ROOT=/workspace
       - JWT_SECRET=kai-doc-pwa-secret-2026

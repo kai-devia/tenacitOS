@@ -14,6 +14,7 @@ const tasksRoutes = require('./routes/tasks');
 const eventsRoutes = require('./routes/events');
 const systemRoutes = require('./routes/system');
 const chatRoutes   = require('./routes/chat');
+const vaultRoutes  = require('./routes/vault');
 
 // Initialize SQLite database (creates tables + seed data on first run)
 require('./db');
@@ -32,6 +33,7 @@ app.use('/api/tasks', tasksRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/system', systemRoutes);
 app.use('/api/chat',   chatRoutes);
+app.use('/api/vault',  vaultRoutes);
 
 // Serve static frontend (./public in Docker, ../frontend/dist in dev)
 const frontendDist = process.env.NODE_ENV === 'production' 

@@ -145,6 +145,7 @@ export default function TasksBoard() {
               >
                 <PriorityDot priority={task.priority} />
                 <div className={styles.itemMain}>
+                  <span className={styles.itemId}>#{task.id}</span>
                   <span className={styles.itemTitle}>{task.title}</span>
                   {task.project && <span className={styles.itemProject}>{task.project}</span>}
                 </div>

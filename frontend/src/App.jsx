@@ -6,8 +6,10 @@ import Layout from './components/Layout/Layout';
 // Sections
 import Sistema from './components/Sistema/Sistema';
 import Chat from './components/Chat/Chat';
-import Heartpulse from './components/Heartpulse/Heartpulse';
+import Tasks from './components/Tasks/Tasks';
+import Pulse from './components/Pulse/Pulse';
 import Mente from './components/Mente/Mente';
+import Vault from './components/Vault/Vault';
 
 // File viewer / editor (used inside Mente with nested routes)
 import Dashboard from './components/Dashboard/Dashboard';
@@ -67,11 +69,20 @@ export default function App() {
         {/* 🖥️ Sistema — system metrics */}
         <Route path="sistema" element={<Sistema />} />
 
-        {/* 💬 Chat — placeholder */}
+        {/* 💬 Chat */}
         <Route path="chat" element={<Chat />} />
 
-        {/* 💓 Heartpulse — tasks + events tabs */}
-        <Route path="heartpulse" element={<Heartpulse />} />
+        {/* ☑ Tasks — Kanban board */}
+        <Route path="tasks" element={<Tasks />} />
+
+        {/* ♥ Pulse — system events */}
+        <Route path="pulse" element={<Pulse />} />
+
+        {/* Legacy redirect */}
+        <Route path="heartpulse" element={<Navigate to="/tasks" replace />} />
+
+        {/* 🔐 Vault — secrets manager */}
+        <Route path="vault" element={<Vault />} />
 
         {/* 🧠 Mente — file tree + markdown viewer + editor */}
         <Route path="mente" element={<Mente />}>
@@ -83,8 +94,7 @@ export default function App() {
         {/* Legacy routes — redirect to Mente equivalents */}
         <Route path="file/*" element={<RedirectFile />} />
         <Route path="edit/*" element={<RedirectEdit />} />
-        <Route path="tasks"  element={<Navigate to="/heartpulse" replace />} />
-        <Route path="events" element={<Navigate to="/heartpulse" replace />} />
+        <Route path="events" element={<Navigate to="/pulse" replace />} />
       </Route>
 
       {/* Catch-all */}

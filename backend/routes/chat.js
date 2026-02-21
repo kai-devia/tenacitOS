@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const db = require('../db');
+const { broadcast } = require('../services/watcherService');
 const router = express.Router();
 
 // Multer config for audio
@@ -149,6 +150,7 @@ async function streamToOpenClaw(message, res, history = []) {
             const assistantMsg = db.prepare(
               "INSERT INTO chat_messages (role, content) VALUES ('assistant', ?) RETURNING *"
             ).get(assistantText);
+            broadcast({ type: 'chat_message', message: assistantMsg });
             res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
             res.end();
             resolve();
@@ -172,6 +174,7 @@ async function streamToOpenClaw(message, res, history = []) {
           const assistantMsg = db.prepare(
             "INSERT INTO chat_messages (role, content) VALUES ('assistant', ?) RETURNING *"
           ).get(assistantText);
+          broadcast({ type: 'chat_message', message: assistantMsg });
           res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
           res.end();
         }
@@ -209,6 +212,9 @@ router.post('/send', async (req, res) => {
   const userMsg = db.prepare(
     "INSERT INTO chat_messages (role, content) VALUES ('user', ?) RETURNING *"
   ).get(message.trim());
+
+  // Broadcast to other connected clients
+  broadcast({ type: 'chat_message', message: userMsg });
 
   // SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
@@ -297,6 +303,9 @@ router.post('/send-audio', upload.single('audio'), async (req, res) => {
     "INSERT INTO chat_messages (role, content) VALUES ('user', ?) RETURNING *"
   ).get(transcript.trim());
 
+  // Broadcast to other connected clients
+  broadcast({ type: 'chat_message', message: userMsg });
+
   // SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -317,6 +326,172 @@ router.post('/send-audio', upload.single('audio'), async (req, res) => {
     console.error('Error streaming response:', err);
   }
 });
+
+// ── POST /api/chat/send-image — Image + optional text → SSE streaming ───────
+router.post('/send-image', upload.single('image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'image file required' });
+  }
+
+  const caption = (req.body.message || '').trim();
+  const base64 = req.file.buffer.toString('base64');
+  const mediaType = req.file.mimetype || 'image/jpeg';
+
+  // Validate image mime type
+  const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (!validTypes.includes(mediaType)) {
+    return res.status(400).json({ error: `Tipo de imagen no soportado: ${mediaType}` });
+  }
+
+  // The text stored in DB (no binary data)
+  const dbContent = caption ? `[Imagen] ${caption}` : '[Imagen]';
+
+  // Load recent history
+  const history = db.prepare(
+    'SELECT role, content FROM chat_messages ORDER BY id DESC LIMIT 40'
+  ).all().reverse();
+
+  // Save user message
+  const userMsg = db.prepare(
+    "INSERT INTO chat_messages (role, content) VALUES ('user', ?) RETURNING *"
+  ).get(dbContent);
+
+  broadcast({ type: 'chat_message', message: userMsg });
+
+  // SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  // Emit user message id so client can map the optimistic message
+  res.write(`data: ${JSON.stringify({ type: 'user_message', message: userMsg })}\n\n`);
+
+  // Build multimodal content — OpenAI vision format (data URL)
+  // OpenClaw uses the OpenAI-compatible endpoint, so we use image_url not Anthropic's source format
+  const imageContent = [
+    {
+      type: 'image_url',
+      image_url: { url: `data:${mediaType};base64,${base64}` },
+    },
+  ];
+  if (caption) {
+    imageContent.push({ type: 'text', text: caption });
+  } else {
+    imageContent.push({ type: 'text', text: 'Describe esta imagen en detalle.' });
+  }
+
+  // Stream vision response
+  try {
+    await streamWithContent(imageContent, res, history);
+  } catch (err) {
+    console.error('Error streaming image response:', err);
+  }
+});
+
+/**
+ * Like streamToOpenClaw but accepts a multimodal content array for vision.
+ */
+async function streamWithContent(userContent, res, history = []) {
+  const systemPrompt = buildSystemPrompt();
+
+  const historyMessages = history.map(m => ({
+    role: m.role,
+    content: m.content,
+  }));
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...historyMessages,
+    { role: 'user', content: userContent },
+  ];
+
+  const body = JSON.stringify({
+    model: 'openclaw',
+    messages,
+    stream: true,
+    user: SESSION_USER,
+  });
+
+  const options = {
+    hostname: OPENCLAW_HOST,
+    port: 18789,
+    path: '/v1/chat/completions',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body),
+      'Authorization': `Bearer ${OPENCLAW_TOKEN}`,
+      'x-openclaw-agent-id': 'pwa',
+    },
+  };
+
+  let assistantText = '';
+
+  return new Promise((resolve, reject) => {
+    const proxyReq = http.request(options, (proxyRes) => {
+      let buffer = '';
+
+      proxyRes.on('error', (err) => {
+        console.error(`[chat/image] proxyRes error: ${err.message}`);
+      });
+
+      proxyRes.on('data', (chunk) => {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          const raw = line.slice(5).trim();
+          if (raw === '[DONE]') {
+            const assistantMsg = db.prepare(
+              "INSERT INTO chat_messages (role, content) VALUES ('assistant', ?) RETURNING *"
+            ).get(assistantText);
+            broadcast({ type: 'chat_message', message: assistantMsg });
+            res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
+            res.end();
+            resolve();
+            return;
+          }
+          try {
+            const event = JSON.parse(raw);
+            const delta = event.choices?.[0]?.delta?.content;
+            if (delta) {
+              assistantText += delta;
+              res.write(`data: ${JSON.stringify({ type: 'delta', content: delta })}\n\n`);
+            }
+          } catch { /* ignore */ }
+        }
+      });
+
+      proxyRes.on('end', () => {
+        if (assistantText && !res.writableEnded) {
+          const assistantMsg = db.prepare(
+            "INSERT INTO chat_messages (role, content) VALUES ('assistant', ?) RETURNING *"
+          ).get(assistantText);
+          broadcast({ type: 'chat_message', message: assistantMsg });
+          res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
+          res.end();
+        }
+        resolve();
+      });
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error('[chat/image] OpenClaw proxy error:', err.message);
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+        res.end();
+      }
+      reject(err);
+    });
+
+    proxyReq.write(body);
+    proxyReq.end();
+  });
+}
 
 module.exports = router;
 module.exports.streamToOpenClaw = streamToOpenClaw;

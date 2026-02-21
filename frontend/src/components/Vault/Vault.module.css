@@ -1,0 +1,304 @@
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+
+.vault {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #1e1e2e;
+  flex-shrink: 0;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a0a0b8;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.lockBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #2a2a3e;
+  border-radius: 6px;
+  background: transparent;
+  color: #a0a0b8;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.lockBtn:hover {
+  border-color: #00d4aa;
+  color: #00d4aa;
+}
+
+/* ── PIN screen ──────────────────────────────────────────────────────────── */
+
+.pinScreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 20px;
+}
+
+.pinCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  background: #161622;
+  border: 1px solid #1e1e2e;
+  border-radius: 12px;
+  padding: 36px 40px;
+  max-width: 380px;
+  width: 100%;
+}
+
+.pinIcon {
+  color: #00d4aa;
+}
+
+.pinTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e0e0f0;
+  margin: 0;
+  text-align: center;
+}
+
+.pinHint {
+  font-size: 0.82rem;
+  color: #666680;
+  text-align: center;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.pinInput {
+  width: 100%;
+  background: #0d0d1a;
+  border: 1px solid #2a2a3e;
+  border-radius: 8px;
+  color: #e0e0f0;
+  font-size: 1rem;
+  padding: 10px 14px;
+  text-align: center;
+  letter-spacing: 0.3em;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.pinInput:focus {
+  border-color: #00d4aa;
+}
+
+.pinError {
+  font-size: 0.8rem;
+  color: #ff6b6b;
+  margin: 0;
+  text-align: center;
+}
+
+.pinBtn {
+  width: 100%;
+  padding: 10px;
+  background: #00d4aa;
+  color: #0d0d1a;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.pinBtn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.pinBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── Entries ─────────────────────────────────────────────────────────────── */
+
+.sections {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sectionLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #666680;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 6px 2px;
+}
+
+.entriesList {
+  background: #161622;
+  border: 1px solid #1e1e2e;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.entryRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-bottom: 1px solid #1e1e2e;
+  min-height: 44px;
+}
+
+.entryRow:last-child {
+  border-bottom: none;
+}
+
+.entryKey {
+  font-size: 0.78rem;
+  font-family: 'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
+  color: #a0a0b8;
+  min-width: 180px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.valueRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.entryValue {
+  font-size: 0.82rem;
+  font-family: 'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
+  color: #555570;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.entryValue.revealed {
+  color: #e0e0f0;
+  user-select: text;
+}
+
+.iconBtn {
+  background: transparent;
+  border: none;
+  color: #555570;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.iconBtn:hover {
+  color: #00d4aa;
+}
+
+/* ── Edit mode ──────────────────────────────────────────────────────────── */
+
+.editRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.editInput {
+  flex: 1;
+  background: #0d0d1a;
+  border: 1px solid #00d4aa;
+  border-radius: 6px;
+  color: #e0e0f0;
+  font-size: 0.82rem;
+  font-family: 'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
+  padding: 5px 10px;
+  outline: none;
+  min-width: 0;
+}
+
+.saveError {
+  font-size: 0.75rem;
+  color: #ff6b6b;
+  white-space: nowrap;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #2a2a3e;
+  border-top-color: #00d4aa;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Mobile ──────────────────────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .entryKey {
+    min-width: 120px;
+    max-width: 120px;
+    font-size: 0.72rem;
+  }
+
+  .pinCard {
+    padding: 28px 24px;
+  }
+}

@@ -241,10 +241,12 @@ router.get('/subagents', (req, res) => {
 // ── claude.ai manual limits ────────────────────────────────────────────────
 router.get('/claude-web-limits', (req, res) => {
   try {
-    const row = db.prepare('SELECT * FROM claude_web_limits WHERE id = 1').get();
+    const row = db.prepare(
+      'SELECT session_pct, weekly_all_pct, weekly_sonnet_pct, session_resets_in, weekly_resets_at, updated_at, session_expired FROM claude_web_limits WHERE id = 1'
+    ).get();
     res.json(row || {
       session_pct: 0, weekly_all_pct: 0, weekly_sonnet_pct: 0,
-      session_resets_in: '', weekly_resets_at: '', updated_at: null,
+      session_resets_in: '', weekly_resets_at: '', updated_at: null, session_expired: 0,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -294,6 +296,77 @@ router.patch('/claude-web-limits', (req, res) => {
     );
 
     res.json({ ok: true, estimated_weekly_limit });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Manual sync trigger → calls host sync-bridge ─────────────────────────
+router.post('/sync-claude', async (req, res) => {
+  try {
+    const bridgeUrl = 'http://172.19.0.1:8766/sync';
+    const response = await fetch(bridgeUrl, {
+      method: 'POST',
+      headers: { 'x-sync-secret': 'kai-sync-secret-2026' },
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      return res.status(502).json({ error: `Bridge error: ${text}` });
+    }
+    const data = await response.json();
+
+    // Mark session_expired in DB based on result
+    if (data.error === 'SESSION_EXPIRED') {
+      db.prepare(`
+        INSERT INTO claude_web_limits (id, session_expired, updated_at)
+        VALUES (1, 1, datetime('now'))
+        ON CONFLICT(id) DO UPDATE SET session_expired = 1
+      `).run();
+    } else if (data.ok) {
+      db.prepare(`
+        INSERT INTO claude_web_limits (id, session_expired, updated_at)
+        VALUES (1, 0, datetime('now'))
+        ON CONFLICT(id) DO UPDATE SET session_expired = 0
+      `).run();
+    }
+
+    res.json(data);
+  } catch (err) {
+    res.status(503).json({ error: `Cannot reach sync bridge: ${err.message}` });
+  }
+});
+
+// ── Update sessionKey + trigger sync ─────────────────────────────────────
+router.post('/claude-session-key', async (req, res) => {
+  const { sessionKey } = req.body;
+  if (!sessionKey || !sessionKey.startsWith('sk-ant-')) {
+    return res.status(400).json({ error: 'sessionKey inválido' });
+  }
+
+  try {
+    // Store in DB (accessible from both Docker and host via shared volume)
+    db.prepare(`
+      INSERT INTO claude_web_limits (id, session_key, session_expired, updated_at)
+      VALUES (1, ?, 0, datetime('now'))
+      ON CONFLICT(id) DO UPDATE SET
+        session_key = excluded.session_key,
+        session_expired = 0
+    `).run(sessionKey);
+
+    // Trigger sync via bridge
+    try {
+      const bridgeRes = await fetch('http://172.19.0.1:8766/sync', {
+        method: 'POST',
+        headers: { 'x-sync-secret': 'kai-sync-secret-2026' },
+      });
+      const syncData = await bridgeRes.json();
+      if (syncData.error === 'SESSION_EXPIRED') {
+        db.prepare(`UPDATE claude_web_limits SET session_expired = 1 WHERE id = 1`).run();
+      }
+      res.json({ ok: true, sync: syncData });
+    } catch {
+      res.json({ ok: true, sync: null, note: 'Key guardada, sync pendiente' });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

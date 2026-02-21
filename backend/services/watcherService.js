@@ -97,6 +97,7 @@ function getClientCount() {
 
 module.exports = {
   initWatcher,
+  broadcast,
   addClient,
   removeClient,
   getClientCount,
