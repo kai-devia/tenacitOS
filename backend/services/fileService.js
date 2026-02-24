@@ -216,6 +216,11 @@ async function createDir(relativePath, root = workspaceRoot) {
   }
 
   await fs.mkdir(fullPath, { recursive: true });
+
+  // Auto-create _index.md so the folder appears in the tree (buildTree skips empty dirs)
+  const indexPath = path.join(fullPath, '_index.md');
+  await fs.writeFile(indexPath, `# ${path.basename(relativePath)}\n\n`, 'utf-8');
+
   return { ok: true };
 }
 
