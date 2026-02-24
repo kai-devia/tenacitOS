@@ -20,6 +20,37 @@ function hexToRgb(hex) {
     : '0, 0, 0';
 }
 
+function hexToHsl(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return [0, 0, 0];
+  let r = parseInt(result[1], 16) / 255;
+  let g = parseInt(result[2], 16) / 255;
+  let b = parseInt(result[3], 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) {
+    h = s = 0;
+  } else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      default: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+}
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const toHex = x => Math.round(x * 255).toString(16).padStart(2, '0');
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+}
+
 function darken(hex, amount = 0.15) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!result) return hex;
@@ -34,6 +65,15 @@ function applyAccent(hex) {
   root.style.setProperty('--accent', hex);
   root.style.setProperty('--accent-hover', darken(hex));
   root.style.setProperty('--accent-rgb', hexToRgb(hex));
+
+  // Derive subtle background tints from the accent hue
+  const [h, s] = hexToHsl(hex);
+  // Very dark tinted backgrounds — same structure as CSS :root but hue-matched
+  root.style.setProperty('--bg-base',    hslToHex(h, Math.min(s, 30), 5));
+  root.style.setProperty('--bg-surface', hslToHex(h, Math.min(s, 25), 9));
+  root.style.setProperty('--bg-sidebar', hslToHex(h, Math.min(s, 20), 7));
+  root.style.setProperty('--bg-card',    hslToHex(h, Math.min(s, 20), 11));
+  root.style.setProperty('--border',     hslToHex(h, Math.min(s, 20), 18));
 }
 
 export function AgentContextProvider({ children }) {

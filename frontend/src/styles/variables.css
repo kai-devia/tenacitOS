@@ -22,11 +22,6 @@
 }
 
 /* ─── PO Mode ─────────────────────────────────────────────────────── */
-/* --accent, --accent-hover, --accent-rgb are managed dynamically by AgentContext */
-[data-mode="PO"] {
-  --bg-base: #0e0b07;
-  --bg-surface: #1a1508;
-  --bg-sidebar: #13100a;
-  --bg-card: #1e1810;
-  --border: #2e2618;
-}
+/* All theme colors (accent + backgrounds) are managed dynamically by AgentContext.
+   When the user picks an accent color, backgrounds are derived from that hue.
+   No hardcoded overrides needed here. */
