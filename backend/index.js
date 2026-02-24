@@ -35,24 +35,23 @@ app.use('/api/system', systemRoutes);
 app.use('/api/chat',   chatRoutes);
 app.use('/api/vault',  vaultRoutes);
 
+// ── Devia Model SPA ─────────────────────────────────────────
+// MUST be registered BEFORE express.static(frontendDist) to avoid
+// collision with /app/public/deviamodel/ if that path ever exists.
+// Served from a host volume mounted at /app/devia-model-web (ro)
+const deviaModelPath = '/app/devia-model-web/dist';
+app.use('/deviamodel', express.static(deviaModelPath));
+app.get(['/deviamodel', '/deviamodel/', '/deviamodel/*'], (req, res) => {
+  res.sendFile(path.join(deviaModelPath, 'index.html'));
+});
+// ────────────────────────────────────────────────────────────
+
 // Serve static frontend (./public in Docker, ../frontend/dist in dev)
 const frontendDist = process.env.NODE_ENV === 'production' 
   ? path.join(__dirname, 'public')
   : path.join(__dirname, '..', 'frontend', 'dist');
 
 app.use(express.static(frontendDist));
-
-// ── Devia Model SPA ─────────────────────────────────────────
-// Served from a host volume mounted at /app/devia-model-web
-// React + Vite build output lives in /dist
-const deviaModelPath = '/app/devia-model-web/dist';
-// Static assets first (js, css, etc.) — must come before the wildcard catch-all
-app.use('/deviamodel', express.static(deviaModelPath));
-// SPA fallback — serves index.html for client-side routes (react-router, scroll anchors, etc.)
-app.get(['/deviamodel', '/deviamodel/', '/deviamodel/*'], (req, res) => {
-  res.sendFile(path.join(deviaModelPath, 'index.html'));
-});
-// ────────────────────────────────────────────────────────────
 
 // SPA fallback - serve index.html for non-API routes
 app.get('*', (req, res, next) => {
