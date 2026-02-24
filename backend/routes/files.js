@@ -127,8 +127,14 @@ router.post('/mkdir', async (req, res) => {
 
   try {
     const root = getWorkspaceRoot(agentId || 'kai');
-    const result = await createDir(dirPath, root);
-    res.json(result);
+    await createDir(dirPath, root);
+
+    // Auto-create _index.md so the folder is visible in the tree
+    const indexPath = `${dirPath}/_index.md`;
+    const folderName = dirPath.split('/').pop();
+    await createFile(indexPath, root, `# ${folderName}\n`);
+
+    res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
