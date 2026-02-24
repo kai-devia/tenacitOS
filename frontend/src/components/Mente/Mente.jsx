@@ -79,6 +79,9 @@ export default function Mente() {
             onToggle={toggleExpand}
             onFileClick={handleFileClick}
             currentPath={currentPath}
+            agentId={agentId}
+            onRefresh={refresh}
+            onError={error}
           />
         </nav>
       </aside>

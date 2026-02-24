@@ -1,6 +1,6 @@
 const express = require('express');
 const { authMiddleware } = require('../middlewares/auth');
-const { getFileTree, getFileContent, writeFileContent, flattenTree } = require('../services/fileService');
+const { getFileTree, getFileContent, writeFileContent, flattenTree, createFile, createDir, deleteItem, renameItem } = require('../services/fileService');
 const { workspacePOKai, workspaceRoot } = require('../config/env');
 
 const router = express.Router();
@@ -93,6 +93,82 @@ router.put('/content', async (req, res) => {
   } catch (err) {
     console.error('Error writing file:', err);
     res.status(500).json({ error: err.message || 'Error al escribir archivo' });
+  }
+});
+
+/**
+ * POST /api/files/create
+ * Body: { path, agentId, content? }
+ * Creates a new .md file
+ */
+router.post('/create', async (req, res) => {
+  const { path: filePath, agentId, content = '' } = req.body;
+
+  if (!filePath) return res.status(400).json({ error: 'Ruta requerida' });
+
+  try {
+    const root = getWorkspaceRoot(agentId || 'kai');
+    const result = await createFile(filePath, root, content);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/files/mkdir
+ * Body: { path, agentId }
+ * Creates a new directory
+ */
+router.post('/mkdir', async (req, res) => {
+  const { path: dirPath, agentId } = req.body;
+
+  if (!dirPath) return res.status(400).json({ error: 'Ruta requerida' });
+
+  try {
+    const root = getWorkspaceRoot(agentId || 'kai');
+    const result = await createDir(dirPath, root);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/files
+ * Body: { path, agentId }
+ * Deletes a file or directory
+ */
+router.delete('/', async (req, res) => {
+  const { path: itemPath, agentId } = req.body;
+
+  if (!itemPath) return res.status(400).json({ error: 'Ruta requerida' });
+
+  try {
+    const root = getWorkspaceRoot(agentId || 'kai');
+    const result = await deleteItem(itemPath, root);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/files/rename
+ * Body: { oldPath, newPath, agentId }
+ * Renames or moves a file/directory
+ */
+router.post('/rename', async (req, res) => {
+  const { oldPath, newPath, agentId } = req.body;
+
+  if (!oldPath || !newPath) return res.status(400).json({ error: 'Rutas requeridas' });
+
+  try {
+    const root = getWorkspaceRoot(agentId || 'kai');
+    const result = await renameItem(oldPath, newPath, root);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

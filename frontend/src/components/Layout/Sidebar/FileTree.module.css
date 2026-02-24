@@ -5,7 +5,19 @@
 }
 
 .item {
-  margin: 2px 0;
+  margin: 1px 0;
+}
+
+/* Row wraps the main button + action icons */
+.row {
+  display: flex;
+  align-items: center;
+  position: relative;
+  border-radius: var(--radius);
+}
+
+.row:hover {
+  background: var(--bg-card);
 }
 
 .folder,
@@ -13,8 +25,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  padding: 8px 16px;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 8px;
   background: none;
   border: none;
   color: var(--text-primary);
@@ -22,11 +35,12 @@
   text-align: left;
   border-radius: var(--radius);
   transition: background var(--transition);
+  cursor: pointer;
 }
 
 .folder:hover,
 .file:hover {
-  background: var(--bg-card);
+  background: none; /* Row handles hover bg */
 }
 
 .file.active {
@@ -39,6 +53,7 @@
   color: var(--text-secondary);
   transition: transform 0.2s ease;
   width: 12px;
+  flex-shrink: 0;
 }
 
 .arrow.expanded {
@@ -55,4 +70,97 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Action buttons (visible on row hover) */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 6px;
+  flex-shrink: 0;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.actionBtn:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.actionDanger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* Create menu dropdown */
+.createWrap {
+  position: relative;
+}
+
+.createMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 100;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px;
+  min-width: 120px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.createMenu button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.createMenu button:hover {
+  background: var(--bg-surface);
+}
+
+/* Inline input for create / rename */
+.inlineInputWrap {
+  flex: 1;
+  padding: 3px 4px;
+}
+
+.inlineInput {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  padding: 4px 8px;
+  outline: none;
+}
+
+.inlineInput::placeholder {
+  color: var(--text-muted, var(--text-secondary));
 }

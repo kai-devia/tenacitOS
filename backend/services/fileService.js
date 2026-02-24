@@ -168,10 +168,103 @@ async function writeFileContent(relativePath, content, root = workspaceRoot) {
   return { ok: true };
 }
 
+/**
+ * Create a new .md file with optional initial content
+ */
+async function createFile(relativePath, root = workspaceRoot, content = '') {
+  if (!isSafePath(relativePath, root)) {
+    throw new Error('Ruta no permitida');
+  }
+
+  if (!relativePath.endsWith('.md')) {
+    throw new Error('Solo se pueden crear archivos .md');
+  }
+
+  const fullPath = path.join(root, relativePath);
+
+  // Ensure parent directory exists
+  await fs.mkdir(path.dirname(fullPath), { recursive: true });
+
+  // Don't overwrite existing files
+  try {
+    await fs.access(fullPath);
+    throw new Error('El archivo ya existe');
+  } catch (err) {
+    if (err.message === 'El archivo ya existe') throw err;
+    // ENOENT = doesn't exist, good
+  }
+
+  await fs.writeFile(fullPath, content, 'utf-8');
+  return { ok: true };
+}
+
+/**
+ * Create a new directory
+ */
+async function createDir(relativePath, root = workspaceRoot) {
+  if (!isSafePath(relativePath, root)) {
+    throw new Error('Ruta no permitida');
+  }
+
+  const fullPath = path.join(root, relativePath);
+
+  try {
+    await fs.access(fullPath);
+    throw new Error('La carpeta ya existe');
+  } catch (err) {
+    if (err.message === 'La carpeta ya existe') throw err;
+  }
+
+  await fs.mkdir(fullPath, { recursive: true });
+  return { ok: true };
+}
+
+/**
+ * Delete a file or directory (recursively)
+ */
+async function deleteItem(relativePath, root = workspaceRoot) {
+  if (!isSafePath(relativePath, root)) {
+    throw new Error('Ruta no permitida');
+  }
+
+  const fullPath = path.join(root, relativePath);
+  const stat = await fs.stat(fullPath);
+
+  if (stat.isDirectory()) {
+    await fs.rm(fullPath, { recursive: true });
+  } else {
+    await fs.unlink(fullPath);
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Rename or move a file/directory
+ */
+async function renameItem(oldRelPath, newRelPath, root = workspaceRoot) {
+  if (!isSafePath(oldRelPath, root) || !isSafePath(newRelPath, root)) {
+    throw new Error('Ruta no permitida');
+  }
+
+  const oldFull = path.join(root, oldRelPath);
+  const newFull = path.join(root, newRelPath);
+
+  // Ensure target parent exists
+  await fs.mkdir(path.dirname(newFull), { recursive: true });
+
+  await fs.rename(oldFull, newFull);
+  return { ok: true };
+}
+
 module.exports = {
   getFileTree,
   flattenTree,
   getFileContent,
   writeFileContent,
+  createFile,
+  createDir,
+  deleteItem,
+  renameItem,
   workspaceRoot,
 };
