@@ -21,6 +21,7 @@
   align-items: center;
   border-bottom: 1px solid var(--border);
   height: 56px;
+  overflow: hidden;
 }
 
 .logoMark {
@@ -30,6 +31,7 @@
   padding: 0 16px;
   flex: 1;
   overflow: hidden;
+  min-width: 0;
 }
 
 .logo {
@@ -51,7 +53,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
+  width: 36px;
   height: 56px;
   background: none;
   border: none;
@@ -65,6 +67,28 @@
 .toggleBtn:hover {
   color: var(--text-primary);
   background: var(--bg-card);
+}
+
+/* Collapsed: logo centered, toggle full width */
+.sidebar.collapsed .logoSection {
+  justify-content: center;
+}
+
+.sidebar.collapsed .logoMark {
+  display: none;
+}
+
+.sidebar.collapsed .toggleBtn {
+  width: 70px;
+  border-left: none;
+}
+
+/* Logo + chevron combined when collapsed */
+.collapsedLogoBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
 
 /* Mode switcher (CORE / PO) */

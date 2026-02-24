@@ -20,10 +20,12 @@ export default function NavSidebar({ collapsed, onToggle }) {
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
       {/* Logo section */}
       <div className={styles.logoSection}>
-        <div className={styles.logoMark}>
-          <img src="/kai-avatar.svg" alt="KAI" width="28" height="28" className={styles.logo} />
-          {!collapsed && <span className={styles.logoText}>Kai</span>}
-        </div>
+        {!collapsed && (
+          <div className={styles.logoMark}>
+            <img src="/kai-avatar.svg" alt="KAI" width="28" height="28" className={styles.logo} />
+            <span className={styles.logoText}>Kai</span>
+          </div>
+        )}
 
         <button
           className={styles.toggleBtn}
@@ -31,7 +33,14 @@ export default function NavSidebar({ collapsed, onToggle }) {
           title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
           aria-label="Toggle navigation"
         >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          {collapsed ? (
+            <div className={styles.collapsedLogoBtn}>
+              <img src="/kai-avatar.svg" alt="KAI" width="24" height="24" className={styles.logo} />
+              <ChevronRight size={12} />
+            </div>
+          ) : (
+            <ChevronLeft size={16} />
+          )}
         </button>
       </div>
 
