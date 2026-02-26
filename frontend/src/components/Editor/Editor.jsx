@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { useFileContent } from '../../hooks/useFiles';
+import MarkdownEditor from './MarkdownEditor';
 import styles from './Editor.module.css';
 
 export default function Editor() {
@@ -57,37 +58,16 @@ export default function Editor() {
   const fileName = filePath.split('/').pop();
 
   return (
-    <div className={styles.container}>
-      <div className={styles.toolbar}>
-        <div className={styles.info}>
-          <span className={styles.icon}>✏️</span>
-          <span className={styles.path}>Editando: {fileName}</span>
-          {hasChanges && <span className={styles.unsaved}>• Sin guardar</span>}
-        </div>
-        <div className={styles.actions}>
-          <button 
-            className={styles.cancelBtn} 
-            onClick={handleCancel}
-            disabled={saving}
-          >
-            ✕ Cancelar
-          </button>
-          <button 
-            className={styles.saveBtn} 
-            onClick={handleSave}
-            disabled={saving || !hasChanges}
-          >
-            {saving ? 'Guardando...' : '💾 Guardar'}
-          </button>
-        </div>
-      </div>
-      
-      <textarea
-        className={styles.editor}
+    <div className={styles.containerFull}>
+      <MarkdownEditor
         value={editedContent}
-        onChange={(e) => setEditedContent(e.target.value)}
-        placeholder="Escribe aquí..."
-        spellCheck="false"
+        onChange={setEditedContent}
+        placeholder="Escribe en Markdown..."
+        fileName={fileName}
+        hasChanges={hasChanges}
+        saving={saving}
+        onSave={handleSave}
+        onCancel={handleCancel}
       />
     </div>
   );

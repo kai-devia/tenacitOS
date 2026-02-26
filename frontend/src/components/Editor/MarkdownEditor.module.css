@@ -1,0 +1,343 @@
+.wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+.wrapper :global(.EasyMDEContainer) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Custom toolbar layout */
+.customToolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px;
+  flex-wrap: nowrap !important;
+  overflow: visible !important;
+  padding-right: 180px !important;
+}
+
+.toolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+  padding-right: 12px;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.fileIcon {
+  font-size: 1rem;
+}
+
+.fileName {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.unsaved {
+  color: #fbbf24;
+  font-size: 0.85rem;
+}
+
+.iconBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: #a1a1aa;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.saveBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: var(--accent);
+  border: none;
+  color: white;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.saveBtn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.saveBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.wrapper :global(.CodeMirror) {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 0 0 12px 12px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 14px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.wrapper :global(.CodeMirror-focused) {
+  border-color: var(--border);
+}
+
+.wrapper :global(.editor-toolbar) {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-radius: 12px 12px 0 0;
+  padding: 10px 12px;
+  opacity: 1;
+  position: relative;
+}
+
+.wrapper :global(.editor-toolbar) button,
+.wrapper :global(.editor-toolbar) a {
+  color: #a1a1aa !important;
+  border: none !important;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wrapper :global(.editor-toolbar) a:hover,
+.wrapper :global(.editor-toolbar) button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff !important;
+}
+
+.wrapper :global(.editor-toolbar) a.active {
+  background: var(--accent);
+  color: white !important;
+}
+
+/* Force FA icons color */
+.wrapper :global(.editor-toolbar) .fa,
+.wrapper :global(.editor-toolbar) [class*="fa-"] {
+  color: #a1a1aa !important;
+}
+
+.wrapper :global(.editor-toolbar) a:hover .fa,
+.wrapper :global(.editor-toolbar) a:hover [class*="fa-"] {
+  color: #ffffff !important;
+}
+
+.wrapper :global(.editor-toolbar i.separator) {
+  border-left: 1px solid #3f3f46 !important;
+  margin: 0 6px;
+}
+
+/* Preview pane */
+.wrapper :global(.editor-preview),
+.preview {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  padding: 24px;
+  font-family: system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+}
+
+.wrapper :global(.editor-preview h1),
+.wrapper :global(.editor-preview h2),
+.wrapper :global(.editor-preview h3),
+.wrapper :global(.editor-preview h4) {
+  color: #ffffff;
+  border-bottom: 1px solid #30363d;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.wrapper :global(.editor-preview h3),
+.wrapper :global(.editor-preview h4) {
+  border-bottom: none;
+}
+
+.wrapper :global(.editor-preview code) {
+  background: var(--bg-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9em;
+}
+
+.wrapper :global(.editor-preview pre) {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.wrapper :global(.editor-preview pre code) {
+  background: none;
+  padding: 0;
+}
+
+.wrapper :global(.editor-preview blockquote) {
+  border-left: 4px solid #30363d;
+  margin: 16px 0;
+  padding-left: 16px;
+  color: #8b949e;
+}
+
+.wrapper :global(.editor-preview a) {
+  color: #58a6ff;
+}
+
+.wrapper :global(.editor-preview table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+
+.wrapper :global(.editor-preview th),
+.wrapper :global(.editor-preview td) {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.wrapper :global(.editor-preview th) {
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+
+/* Side-by-side mode */
+.wrapper :global(.editor-preview-side) {
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border);
+}
+
+/* Fullscreen mode */
+.wrapper :global(.EasyMDEContainer.fullscreen) {
+  z-index: 9999;
+  background: var(--bg-base) !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+
+.wrapper :global(.editor-toolbar.fullscreen) {
+  background: var(--bg-card) !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 10000;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.wrapper :global(.CodeMirror-fullscreen) {
+  background: var(--bg-card) !important;
+  position: fixed !important;
+  top: 50px !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 9999;
+  border-radius: 0 !important;
+}
+
+.wrapper :global(.editor-preview-side.fullscreen) {
+  background: var(--bg-card) !important;
+  position: fixed !important;
+  z-index: 9999;
+}
+
+/* CodeMirror theme adjustments - NEUTRAL colors like read view */
+.wrapper :global(.CodeMirror-cursor) {
+  border-left-color: #ffffff;
+}
+
+.wrapper :global(.CodeMirror-selected) {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.wrapper :global(.cm-header) {
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+.wrapper :global(.cm-header-1) {
+  font-size: 1.5em;
+}
+
+.wrapper :global(.cm-header-2) {
+  font-size: 1.3em;
+}
+
+.wrapper :global(.cm-header-3) {
+  font-size: 1.1em;
+}
+
+.wrapper :global(.cm-link) {
+  color: #58a6ff;
+}
+
+.wrapper :global(.cm-url) {
+  color: #8b949e;
+}
+
+.wrapper :global(.cm-comment) {
+  color: #6e7681;
+}
+
+.wrapper :global(.cm-strong) {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.wrapper :global(.cm-em) {
+  color: #e6edf3;
+  font-style: italic;
+}
+
+/* Scrollbar */
+.wrapper :global(.CodeMirror-vscrollbar),
+.wrapper :global(.CodeMirror-hscrollbar) {
+  outline: none;
+}

@@ -65,18 +65,20 @@ export default function MarkdownView() {
   const fileName = filePath.split('/').pop();
 
   return (
-    <div className={styles.container}>
-      <div className={styles.toolbar}>
-        <button className={styles.backBtn} onClick={handleBack}>
-          ← Volver
-        </button>
-        <div className={styles.breadcrumb}>
-          <span className={styles.icon}>{getFileIcon(filePath)}</span>
-          <span className={styles.path}>{filePath}</span>
+    <div className={styles.containerFull}>
+      <div className={styles.toolbarCompact}>
+        <div className={styles.toolbarLeft}>
+          <span className={styles.fileIcon}>{getFileIcon(filePath)}</span>
+          <span className={styles.fileName}>{fileName}</span>
         </div>
-        <button className={styles.editBtn} onClick={handleEdit}>
-          ✏️ Editar
-        </button>
+        <div className={styles.toolbarRight}>
+          <button className={styles.iconBtn} onClick={handleBack} title="Volver">
+            <i className="fa fa-arrow-left"></i>
+          </button>
+          <button className={styles.editBtn} onClick={handleEdit} title="Editar">
+            <i className="fa fa-pencil"></i>
+          </button>
+        </div>
       </div>
       
       <article className={styles.content}>

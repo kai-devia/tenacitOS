@@ -6,6 +6,13 @@
   margin: 0 auto;
 }
 
+.containerFull {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--header-height));
+  width: 100%;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
