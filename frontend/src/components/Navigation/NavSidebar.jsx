@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { to: '/pulse',     icon: Activity,      label: 'Pulse' },
   { to: '/mente',     icon: Brain,         label: 'Mente' },
   { to: '/proyectos', icon: FolderOpen,    label: 'Proyectos' },
-  { to: '/vault',     icon: Lock,          label: 'Vault' },
+  { to: '/vault',     icon: Lock,          label: 'Vault',     onlyFor: ['CORE'] },
 ];
 
 export default function NavSidebar({ collapsed, onToggle }) {
