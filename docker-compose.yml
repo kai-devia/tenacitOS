@@ -10,7 +10,7 @@ services:
     ports:
       - "80:3001"
     volumes:
-      - /home/kai/.openclaw/workspace:/workspace:rw
+      - /home/kai/.instances/core/workspace:/workspace:rw
       - /home/kai/.instances/po/workspace:/workspace-po-kai:rw
       - /home/kai/.instances/fe/workspace:/workspace-fe-kai:rw
       - /home/kai/.instances/be/workspace:/workspace-be-kai:rw
@@ -18,9 +18,9 @@ services:
       - /home/kai/.instances/qa/workspace:/workspace-qa-kai:rw
       - /home/kai/.kai-shared:/home/kai/.kai-shared:ro
       - /home/kai/projects/KAI-PWA/data:/app/data:rw
-      - /home/kai/.openclaw/agents:/home/kai/.openclaw/agents:ro
       - /home/kai/.kai-secrets:/app/vault-secrets:rw
       - /home/kai/projects/devia-model-web:/app/devia-model-web:ro
+      - /var/run/docker.sock:/var/run/docker.sock:rw
     environment:
       - WORKSPACE_ROOT=/workspace
       - WORKSPACE_PO_KAI=/workspace-po-kai
