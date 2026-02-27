@@ -11,7 +11,11 @@ services:
       - "80:3001"
     volumes:
       - /home/kai/.openclaw/workspace:/workspace:rw
-      - /home/kai/.openclaw/workspace-po-kai:/workspace-po-kai:rw
+      - /home/kai/.instances/po/workspace:/workspace-po-kai:rw
+      - /home/kai/.instances/fe/workspace:/workspace-fe-kai:rw
+      - /home/kai/.instances/be/workspace:/workspace-be-kai:rw
+      - /home/kai/.instances/ux/workspace:/workspace-ux-kai:rw
+      - /home/kai/.instances/qa/workspace:/workspace-qa-kai:rw
       - /home/kai/.kai-shared:/home/kai/.kai-shared:ro
       - /home/kai/projects/kai-doc-pwa/data:/app/data:rw
       - /home/kai/.openclaw/agents:/home/kai/.openclaw/agents:ro
@@ -20,6 +24,10 @@ services:
     environment:
       - WORKSPACE_ROOT=/workspace
       - WORKSPACE_PO_KAI=/workspace-po-kai
+      - WORKSPACE_FE_KAI=/workspace-fe-kai
+      - WORKSPACE_BE_KAI=/workspace-be-kai
+      - WORKSPACE_UX_KAI=/workspace-ux-kai
+      - WORKSPACE_QA_KAI=/workspace-qa-kai
       - JWT_SECRET=kai-doc-pwa-secret-2026
       - PORT=3001
       - TELEGRAM_BOT_TOKEN=8291237173:AAElzKvQHvIjVQZ8Pm2yaBFdoXB9aiRKqik
@@ -27,3 +35,15 @@ services:
       - PHYSICAL_DISK_GB=914
       - HOME=/home/kai
       - OPENCLAW_GATEWAY_TOKEN=b2348138eb8d24617942e09e209ebecd7817dfddf9754518
+      - OPENCLAW_CORE_PORT=18791
+      - OPENCLAW_CORE_TOKEN=b2348138eb8d24617942e09e209ebecd7817dfddf9754518
+      - OPENCLAW_PO_PORT=18790
+      - OPENCLAW_PO_TOKEN=po-agent-gateway-token-2026-kai
+      - OPENCLAW_FE_PORT=18796
+      - OPENCLAW_FE_TOKEN=fe-agent-gateway-token-2026-kai
+      - OPENCLAW_BE_PORT=18793
+      - OPENCLAW_BE_TOKEN=be-agent-gateway-token-2026-kai
+      - OPENCLAW_UX_PORT=18794
+      - OPENCLAW_UX_TOKEN=ux-agent-gateway-token-2026-kai
+      - OPENCLAW_QA_PORT=18795
+      - OPENCLAW_QA_TOKEN=qa-agent-gateway-token-2026-kai
