@@ -14,43 +14,10 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
 });
 
-// Desde Docker, el host es accesible via la gateway de la red Docker
-// 172.19.0.1 = host desde kai-network; fallback a HOST_GATEWAY env var
-const OPENCLAW_HOST = process.env.OPENCLAW_GATEWAY_HOST || '172.19.0.1';
-
-// Puertos, agentIds y tokens por modo
-const AGENT_CONFIG = {
-  'kai':    { 
-    port: parseInt(process.env.OPENCLAW_CORE_PORT || '18791'), 
-    agentId: 'core',
-    token: process.env.OPENCLAW_CORE_TOKEN || process.env.OPENCLAW_GATEWAY_TOKEN
-  },
-  'po-kai': { 
-    port: parseInt(process.env.OPENCLAW_PO_PORT || '18790'), 
-    agentId: 'po',
-    token: process.env.OPENCLAW_PO_TOKEN || process.env.OPENCLAW_GATEWAY_TOKEN
-  },
-  'fe-kai': {
-    port: parseInt(process.env.OPENCLAW_FE_PORT || '18796'),
-    agentId: 'fe',
-    token: process.env.OPENCLAW_FE_TOKEN || process.env.OPENCLAW_GATEWAY_TOKEN
-  },
-  'be-kai': {
-    port: parseInt(process.env.OPENCLAW_BE_PORT || '18793'),
-    agentId: 'be',
-    token: process.env.OPENCLAW_BE_TOKEN || process.env.OPENCLAW_GATEWAY_TOKEN
-  },
-  'ux-kai': {
-    port: parseInt(process.env.OPENCLAW_UX_PORT || '18794'),
-    agentId: 'ux',
-    token: process.env.OPENCLAW_UX_TOKEN || process.env.OPENCLAW_GATEWAY_TOKEN
-  },
-  'qa-kai': {
-    port: parseInt(process.env.OPENCLAW_QA_PORT || '18795'),
-    agentId: 'qa',
-    token: process.env.OPENCLAW_QA_TOKEN || process.env.OPENCLAW_GATEWAY_TOKEN
-  },
-};
+// Conexión única al agente Kai (OpenClaw gateway)
+const OPENCLAW_HOST  = process.env.OPENCLAW_GATEWAY_HOST || 'kai';
+const OPENCLAW_PORT  = parseInt(process.env.OPENCLAW_PORT || process.env.OPENCLAW_CORE_PORT || '18800');
+const OPENCLAW_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || process.env.OPENCLAW_CORE_TOKEN || '';
 const SESSION_USER   = 'kai-doc-pwa'; // stable session key via OpenClaw user field
 const WHISPER_HOST = process.env.WHISPER_HOST || '172.19.0.1';
 const WHISPER_PORT = process.env.WHISPER_PORT || 9876;
@@ -105,7 +72,7 @@ console.log('[chat] system prompt will be built dynamically per request');
 router.get('/history', (req, res) => {
   try {
     const limit = parseInt(req.query.limit || '100', 10);
-    const agentId = req.query.agentId || 'kai';
+    const agentId = 'kai';
     const msgs = db.prepare(
       'SELECT * FROM chat_messages WHERE agent_id = ? ORDER BY id DESC LIMIT ?'
     ).all(agentId, limit).reverse();
@@ -118,7 +85,7 @@ router.get('/history', (req, res) => {
 // ── DELETE /api/chat/history?agentId=po-kai ──────────────────────────────
 router.delete('/history', (req, res) => {
   try {
-    const agentId = req.query.agentId || 'kai';
+    const agentId = 'kai';
     db.prepare('DELETE FROM chat_messages WHERE agent_id = ?').run(agentId);
     res.json({ ok: true });
   } catch (err) {
@@ -134,7 +101,7 @@ function sanitizeHistory(history) {
     .map(m => ({ role: m.role, content: m.content }));
 }
 
-async function streamToOpenClaw(message, res, history = [], sessionUser = SESSION_USER, agentId = 'kai') {
+async function streamToOpenClaw(message, res, history = [], sessionUser = SESSION_USER) {
   // System prompt built fresh each request — reflects latest MEMORY.md, daily notes, etc.
   const systemPrompt = buildSystemPrompt();
 
@@ -154,22 +121,15 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
     stream: true,
   });
 
-  // Determine which agent ID, port, and token to use in OpenClaw request
-  const agentCfg = AGENT_CONFIG[agentId] || AGENT_CONFIG['kai'];
-  const openclawAgentId = agentCfg.agentId;
-  const openclawPort    = agentCfg.port;
-  const openclawToken   = agentCfg.token;
-
   const options = {
     hostname: OPENCLAW_HOST,
-    port: openclawPort,
+    port: OPENCLAW_PORT,
     path: '/v1/chat/completions',
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(body),
-      'Authorization': `Bearer ${openclawToken}`,
-      'x-openclaw-agent-id': openclawAgentId,
+      'Authorization': `Bearer ${OPENCLAW_TOKEN}`,
     },
   };
 
@@ -250,12 +210,12 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
 
 // ── POST /api/chat/send — SSE streaming ───────────────────────────────────
 router.post('/send', async (req, res) => {
-  const { message, agentId } = req.body;
+  const { message } = req.body;
   if (!message?.trim()) {
     return res.status(400).json({ error: 'message required' });
   }
 
-  const agent = agentId || 'kai';
+  const agent = 'kai';
 
   // Load recent conversation history (last 40 messages = 20 turns) before saving current
   const history = db.prepare(
@@ -282,7 +242,7 @@ router.post('/send', async (req, res) => {
 
   // Stream response from OpenClaw (with history for conversational context)
   try {
-    await streamToOpenClaw(message.trim(), res, history, SESSION_USER, agent);
+    await streamToOpenClaw(message.trim(), res, history, SESSION_USER);
   } catch (err) {
     console.error('Error streaming response:', err);
   }
@@ -334,7 +294,7 @@ router.post('/send-audio', upload.single('audio'), async (req, res) => {
     return res.status(400).json({ error: 'audio file required' });
   }
 
-  const agentId = req.body.agentId || 'kai';
+  const agentId = 'kai';
 
   // Transcribe audio
   let transcript;
@@ -377,7 +337,7 @@ router.post('/send-audio', upload.single('audio'), async (req, res) => {
 
   // Stream response from OpenClaw (with history for conversational context)
   try {
-    await streamToOpenClaw(transcript.trim(), res, history, SESSION_USER, agentId);
+    await streamToOpenClaw(transcript.trim(), res, history, SESSION_USER);
   } catch (err) {
     console.error('Error streaming response:', err);
   }
@@ -390,7 +350,7 @@ router.post('/send-image', upload.single('image'), async (req, res) => {
   }
 
   const caption = (req.body.message || '').trim();
-  const agentId = req.body.agentId || 'kai';
+  const agentId = 'kai';
   const mediaType = req.file.mimetype || 'image/jpeg';
 
   // Validate image mime type
@@ -450,7 +410,7 @@ router.post('/send-image', upload.single('image'), async (req, res) => {
 
   // Stream vision response — OpenClaw reads the image via Read tool
   try {
-    await streamToOpenClaw(imagePrompt, res, history, SESSION_USER, agentId);
+    await streamToOpenClaw(imagePrompt, res, history, SESSION_USER);
   } catch (err) {
     console.error('Error streaming image response:', err);
   }
@@ -483,14 +443,13 @@ async function streamWithContent(userContent, res, history = []) {
 
   const options = {
     hostname: OPENCLAW_HOST,
-    port: AGENT_CONFIG['kai'].port,
+    port: OPENCLAW_PORT,
     path: '/v1/chat/completions',
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(body),
-      'Authorization': `Bearer ${AGENT_CONFIG['kai'].token}`,
-      'x-openclaw-agent-id': AGENT_CONFIG['kai'].agentId,
+      'Authorization': `Bearer ${OPENCLAW_TOKEN}`,
     },
   };
 
@@ -572,11 +531,9 @@ async function streamWithContent(userContent, res, history = []) {
 // El AbortController del frontend solo corta el stream HTTP desde el cliente;
 // esto garantiza que OpenClaw deja de procesar y ejecutar tools en el servidor.
 router.post('/abort', async (req, res) => {
-  const { agentId } = req.body;
-  const agent = agentId || 'kai';
-  const agentCfg = AGENT_CONFIG[agent] || AGENT_CONFIG['kai'];
-  const wsUrl = `ws://${OPENCLAW_HOST}:${agentCfg.port}/`;
-  const token = agentCfg.token;
+  const agent = 'kai';
+  const wsUrl = `ws://${OPENCLAW_HOST}:${OPENCLAW_PORT}/`;
+  const token = OPENCLAW_TOKEN;
 
   const WebSocket = require('ws');
   const ws = new WebSocket(wsUrl, {
