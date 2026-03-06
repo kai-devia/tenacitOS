@@ -5,13 +5,13 @@ import { AgentContext } from '../../context/AgentContext';
 import styles from './NavSidebar.module.css';
 
 const NAV_ITEMS = [
-  { to: '/sistema',   icon: Monitor,       label: 'Sistema',   onlyFor: ['CORE'] },
-  { to: '/chat',      icon: MessageSquare, label: 'Chat' },
-  { to: '/tasks',     icon: CheckSquare,   label: 'Tasks' },
-  { to: '/pulse',     icon: Activity,      label: 'Pulse' },
-  { to: '/mente',     icon: Brain,         label: 'Mente' },
+  { to: '/sistema',   icon: Monitor,       label: 'Sistema'   },
+  { to: '/chat',      icon: MessageSquare, label: 'Chat'      },
+  { to: '/tasks',     icon: CheckSquare,   label: 'Tasks'     },
+  { to: '/pulse',     icon: Activity,      label: 'Pulse'     },
+  { to: '/mente',     icon: Brain,         label: 'Mente'     },
   { to: '/proyectos', icon: FolderOpen,    label: 'Proyectos' },
-  { to: '/vault',     icon: Lock,          label: 'Vault',     onlyFor: ['CORE'] },
+  { to: '/vault',     icon: Lock,          label: 'Vault'     },
 ];
 
 export default function NavSidebar({ collapsed, onToggle }) {
@@ -83,64 +83,14 @@ export default function NavSidebar({ collapsed, onToggle }) {
           aria-label="Toggle navigation"
         >
           <img src="/kai-avatar.svg" alt="KAI" width="26" height="26" className={styles.logo} />
-          {!collapsed && <span className={styles.logoText}>Kai</span>}
+          {!collapsed && <span className={styles.logoText}>KaiOS</span>}
         </button>
       </div>
 
-      {/* Mode selector */}
-      <div
-        className={styles.modeSection}
-        ref={triggerRef}
-      >
-        <div
-          className={styles.modeTrigger}
-          onClick={handleTriggerClick}
-          title={`Modo: ${agentName}`}
-        >
-          {collapsed
-            ? <span className={styles.modeAbbr}>{agentName.toUpperCase()}</span>
-            : <span className={styles.modeLabel}>{agentName}</span>
-          }
-        </div>
-
-        {/* Expanded mode: inline dropdown */}
-        {!collapsed && dropdownOpen && (
-          <div className={styles.modeDropdown} ref={dropdownRef}>
-            {agents.map((agent) => (
-              <div
-                key={agent.id}
-                className={`${styles.modeOption} ${agentId === agent.id ? styles.modeOptionActive : ''}`}
-                onClick={() => handleAgentChange(agent.id)}
-              >
-                <span className={styles.modeOptionLabel}>{agent.name}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Collapsed mode: floating dropdown via position:fixed */}
-      {collapsed && dropdownOpen && (
-        <div
-          className={styles.modeDropdownFixed}
-          ref={dropdownRef}
-          style={{ top: dropdownPos.top, left: dropdownPos.left }}
-        >
-          {agents.map((agent) => (
-            <div
-              key={agent.id}
-              className={`${styles.modeOption} ${agentId === agent.id ? styles.modeOptionActive : ''}`}
-              onClick={() => handleAgentChange(agent.id)}
-            >
-              <span className={styles.modeOptionLabel}>{agent.name}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Selector de agente eliminado — agente único */}
 
       <nav className={styles.nav}>
         {NAV_ITEMS
-          .filter(({ onlyFor }) => !onlyFor || onlyFor.includes(agentName))
           .map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}

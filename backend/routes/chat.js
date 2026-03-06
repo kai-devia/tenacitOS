@@ -155,7 +155,7 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
             if (assistantText && !res.writableEnded) {
               const assistantMsg = db.prepare(
                 "INSERT INTO chat_messages (role, content, agent_id) VALUES ('assistant', ?, ?) RETURNING *"
-              ).get(assistantText, agentId);
+              ).get(assistantText, 'kai');
               broadcast({ type: 'chat_message', message: assistantMsg });
               res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
             } else if (!res.writableEnded) {
@@ -183,7 +183,7 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
         if (assistantText && !res.writableEnded) {
           const assistantMsg = db.prepare(
             "INSERT INTO chat_messages (role, content, agent_id) VALUES ('assistant', ?, ?) RETURNING *"
-          ).get(assistantText, agentId);
+          ).get(assistantText, 'kai');
           broadcast({ type: 'chat_message', message: assistantMsg });
           res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
           res.end();
@@ -475,7 +475,7 @@ async function streamWithContent(userContent, res, history = []) {
             if (assistantText && !res.writableEnded) {
               const assistantMsg = db.prepare(
                 "INSERT INTO chat_messages (role, content, agent_id) VALUES ('assistant', ?, ?) RETURNING *"
-              ).get(assistantText, agentId);
+              ).get(assistantText, 'kai');
               broadcast({ type: 'chat_message', message: assistantMsg });
               res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
             } else if (!res.writableEnded) {
@@ -501,7 +501,7 @@ async function streamWithContent(userContent, res, history = []) {
         if (assistantText && !res.writableEnded) {
           const assistantMsg = db.prepare(
             "INSERT INTO chat_messages (role, content, agent_id) VALUES ('assistant', ?, ?) RETURNING *"
-          ).get(assistantText, agentId);
+          ).get(assistantText, 'kai');
           broadcast({ type: 'chat_message', message: assistantMsg });
           res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
           res.end();
